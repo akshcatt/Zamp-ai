@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: clearap
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AP_TODAY
+        value: "2026-11-12"

@@ -1,0 +1,65 @@
+[
+  {
+    "file": "01_happy_northwind_NW-58213.pdf",
+    "id": "happy_path",
+    "kind": "Happy path",
+    "title": "Clean invoice, exact 3-way match",
+    "vendor": "Northwind Office Supplies Inc.",
+    "what_to_expect": "Approved. PO match is exact, goods received, and the 2/10 early-payment discount is flagged.",
+    "scanned": false
+  },
+  {
+    "file": "02_edge_split_billing_atlas_ATL-INV-1209.pdf",
+    "id": "edge_split_po_overrun",
+    "kind": "Edge case 1",
+    "title": "Split billing pushes PO over its cap",
+    "vendor": "Atlas Cloud Services LLC",
+    "what_to_expect": "On hold for the buyer. This invoice alone looks fine, but combined with the $30,000 already billed it overruns the 320-hour PO by $3,750 (7.8%). The process suggests a partial approval of $18,000.",
+    "scanned": false
+  },
+  {
+    "file": "03_edge_scanned_no_po_brightline_BLX-30871.pdf",
+    "id": "edge_scanned_inferred_po",
+    "kind": "Edge case 2",
+    "title": "Scanned image, no PO reference",
+    "vendor": "Brightline Logistics Ltd.",
+    "what_to_expect": "The PDF has no text layer, so Gemini reads the page image. No PO is quoted. The process scores the vendor's 2 open POs on lines, amounts and remaining balance, infers PO-2026-0342 with high confidence, confirms delivery, and approves with an inferred-PO note.",
+    "scanned": true
+  },
+  {
+    "file": "04_edge_disguised_duplicate_meridian_INV-2026-0417.pdf",
+    "id": "edge_disguised_duplicate",
+    "kind": "Edge case 3",
+    "title": "Re-sent duplicate with a reformatted number",
+    "vendor": "Meridian Industrial Parts Co.",
+    "what_to_expect": "Rejected as a duplicate. It's a different file (new hash) and the number is written differently ('INV-2026-0417' vs 'INV 2026/0417'), but the normalised number, vendor and amount match an invoice already paid on ACH-77812.",
+    "scanned": false
+  },
+  {
+    "file": "05_edge_bank_change_keystone_KFM-2026-1147.pdf",
+    "id": "edge_bank_change_fraud",
+    "kind": "Edge case 4",
+    "title": "Perfect match, but the bank account changed",
+    "vendor": "Keystone Facilities Management Inc.",
+    "what_to_expect": "On hold for Treasury and fraud review. Every number matches the PO, but the remit-to bank account and the sender's email domain don't match the vendor master. This is the classic business email compromise pattern. The process never uses contact details printed on the invoice, and tells AP to call back on the number on file.",
+    "scanned": false
+  },
+  {
+    "file": "06_variant_tolerance_pinnacle_PPP-7734.pdf",
+    "id": "variant_within_tolerance",
+    "kind": "Extra input",
+    "title": "Close but not exact: unbudgeted freight",
+    "vendor": "Pinnacle Print & Packaging LLC",
+    "what_to_expect": "Approved with a note. The vendor added a $45 freight line that isn't on the PO. That's +0.78%, inside the 2% / $500 tolerance, so it passes without a human touch and the variance is logged.",
+    "scanned": false
+  },
+  {
+    "file": "07_variant_missing_fields_halcyon.pdf",
+    "id": "variant_missing_fields",
+    "kind": "Extra input",
+    "title": "No invoice number, no date",
+    "vendor": "Halcyon Catering Co.",
+    "what_to_expect": "Returned to the vendor. Without an invoice number the invoice can't be posted or checked for duplicates. The process drafts the email to the vendor explaining exactly what's missing.",
+    "scanned": false
+  }
+]

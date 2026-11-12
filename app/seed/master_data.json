@@ -1,0 +1,202 @@
+{
+  "company": {
+    "legal_name": "Lumen Home Goods, Inc.",
+    "aliases": ["Lumen Home Goods", "Lumen Home Goods Inc"],
+    "address": "410 Hudson Street, New York, NY 10014",
+    "base_currency": "USD"
+  },
+  "vendors": [
+    {
+      "vendor_id": "V-1001",
+      "legal_name": "Northwind Office Supplies Inc.",
+      "aliases": ["Northwind Office Supplies", "Northwind Supplies"],
+      "tax_id": "94-3127756",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "2/10 Net 30",
+      "email_domain": "northwindsupplies.com",
+      "phone_on_file": "+1 (212) 555-0141",
+      "bank": {"bank_name": "JPMorgan Chase Bank, N.A.", "routing_number": "021000021", "account_number": "000123454417"}
+    },
+    {
+      "vendor_id": "V-1002",
+      "legal_name": "Atlas Cloud Services LLC",
+      "aliases": ["Atlas Cloud Services", "Atlas Cloud"],
+      "tax_id": "47-2210983",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "Net 30",
+      "email_domain": "atlascloud.io",
+      "phone_on_file": "+1 (415) 555-0178",
+      "bank": {"bank_name": "Silicon Valley Bank", "routing_number": "121140399", "account_number": "3300918842"}
+    },
+    {
+      "vendor_id": "V-1003",
+      "legal_name": "Brightline Logistics Ltd.",
+      "aliases": ["Brightline Logistics", "Brightline Freight"],
+      "tax_id": "36-4419270",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "Net 45",
+      "email_domain": "brightlinelogistics.com",
+      "phone_on_file": "+1 (312) 555-0122",
+      "bank": {"bank_name": "BMO Bank N.A.", "routing_number": "071000288", "account_number": "2209914460"}
+    },
+    {
+      "vendor_id": "V-1004",
+      "legal_name": "Meridian Industrial Parts Co.",
+      "aliases": ["Meridian Industrial Parts", "Meridian Industrial"],
+      "tax_id": "22-3098817",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "Net 30",
+      "email_domain": "meridianparts.com",
+      "phone_on_file": "+1 (973) 555-0190",
+      "bank": {"bank_name": "TD Bank, N.A.", "routing_number": "031201360", "account_number": "4410287736"}
+    },
+    {
+      "vendor_id": "V-1005",
+      "legal_name": "Keystone Facilities Management Inc.",
+      "aliases": ["Keystone Facilities Management", "Keystone FM", "Keystone Facilities"],
+      "tax_id": "13-5582014",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "Net 30",
+      "email_domain": "keystonefm.com",
+      "phone_on_file": "+1 (718) 555-0163",
+      "bank": {"bank_name": "Wells Fargo Bank, N.A.", "routing_number": "121000248", "account_number": "4031557781"}
+    },
+    {
+      "vendor_id": "V-1006",
+      "legal_name": "Pinnacle Print & Packaging LLC",
+      "aliases": ["Pinnacle Print & Packaging", "Pinnacle Print and Packaging", "Pinnacle Packaging"],
+      "tax_id": "11-3374520",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "Net 30",
+      "email_domain": "pinnacleprint.com",
+      "phone_on_file": "+1 (516) 555-0137",
+      "bank": {"bank_name": "Citibank, N.A.", "routing_number": "021000089", "account_number": "6672019934"}
+    },
+    {
+      "vendor_id": "V-1007",
+      "legal_name": "Halcyon Catering Co.",
+      "aliases": ["Halcyon Catering", "Halcyon Events & Catering"],
+      "tax_id": "13-4471209",
+      "status": "active",
+      "currency": "USD",
+      "payment_terms": "Net 15",
+      "email_domain": "halcyoncatering.com",
+      "phone_on_file": "+1 (646) 555-0119",
+      "bank": {"bank_name": "Bank of America, N.A.", "routing_number": "026009593", "account_number": "4830021175"}
+    },
+    {
+      "vendor_id": "V-1008",
+      "legal_name": "Vertex Tooling Corp.",
+      "aliases": ["Vertex Tooling"],
+      "tax_id": "38-2290114",
+      "status": "blocked",
+      "status_reason": "Failed annual compliance review (sanctions screening), 2026-09-30",
+      "currency": "USD",
+      "payment_terms": "Net 30",
+      "email_domain": "vertextooling.com",
+      "phone_on_file": "+1 (248) 555-0104",
+      "bank": {"bank_name": "Comerica Bank", "routing_number": "072000096", "account_number": "1851203347"}
+    }
+  ],
+  "purchase_orders": [
+    {
+      "po_number": "PO-2026-0311", "vendor_id": "V-1001", "issue_date": "2026-10-20", "currency": "USD",
+      "status": "open", "buyer": "Priya Nair (Workplace Ops)", "cost_center": "CC-410 Workplace", "receipt_required": true,
+      "description": "Q4 office consumables and seating",
+      "lines": [
+        {"line_no": 1, "sku": "PPR-A4-10", "description": "A4 copy paper, 80gsm (case of 10 reams)", "qty": 40, "unit_price": 38.50, "gl_account": "6100 Office Supplies"},
+        {"line_no": 2, "sku": "TNR-HP58A", "description": "HP 58A black toner cartridge", "qty": 12, "unit_price": 96.00, "gl_account": "6100 Office Supplies"},
+        {"line_no": 3, "sku": "CHR-ERG-M", "description": "Ergonomic mesh office chair", "qty": 6, "unit_price": 289.00, "gl_account": "6150 Furniture (expensed)"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0287", "vendor_id": "V-1002", "issue_date": "2026-09-01", "currency": "USD",
+      "status": "open", "buyer": "Daniel Okafor (Data Platform)", "cost_center": "CC-220 Engineering", "receipt_required": false,
+      "description": "Data platform implementation — time & materials, capped at 320 hours",
+      "lines": [
+        {"line_no": 1, "sku": "SVC-IMPL-HR", "description": "Data platform implementation consulting (hourly)", "qty": 320, "unit_price": 150.00, "gl_account": "6420 Professional Services"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0342", "vendor_id": "V-1003", "issue_date": "2026-10-27", "currency": "USD",
+      "status": "open", "buyer": "Marcus Lee (Supply Chain)", "cost_center": "CC-310 Distribution", "receipt_required": true,
+      "description": "Outbound LTL freight, Chicago DC to Columbus store cluster (3 loads)",
+      "lines": [
+        {"line_no": 1, "sku": "FRT-LTL-CHI-CMH", "description": "LTL freight, Chicago IL to Columbus OH", "qty": 3, "unit_price": 1240.00, "gl_account": "5300 Freight Out"},
+        {"line_no": 2, "sku": "FRT-FUEL", "description": "Fuel surcharge (8%)", "qty": 1, "unit_price": 297.60, "gl_account": "5300 Freight Out"},
+        {"line_no": 3, "sku": "FRT-LIFT", "description": "Liftgate delivery", "qty": 3, "unit_price": 85.00, "gl_account": "5300 Freight Out"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0298", "vendor_id": "V-1003", "issue_date": "2026-09-25", "currency": "USD",
+      "status": "open", "buyer": "Marcus Lee (Supply Chain)", "cost_center": "CC-310 Distribution", "receipt_required": false,
+      "description": "Overflow warehouse storage, Oct–Dec 2026",
+      "lines": [
+        {"line_no": 1, "sku": "WH-STOR-MO", "description": "Pallet storage, overflow warehouse (monthly)", "qty": 3, "unit_price": 2000.00, "gl_account": "5350 Warehousing"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0275", "vendor_id": "V-1004", "issue_date": "2026-09-18", "currency": "USD",
+      "status": "closed", "buyer": "Marcus Lee (Supply Chain)", "cost_center": "CC-330 Maintenance", "receipt_required": true,
+      "description": "Conveyor maintenance spares",
+      "lines": [
+        {"line_no": 1, "sku": "BRG-6204", "description": "Ball bearing 6204-2RS", "qty": 500, "unit_price": 4.20, "gl_account": "6600 Repairs & Maintenance"},
+        {"line_no": 2, "sku": "HOS-HYD-36", "description": "Hydraulic hose assembly 1/2 in x 36 in", "qty": 40, "unit_price": 62.50, "gl_account": "6600 Repairs & Maintenance"},
+        {"line_no": 3, "sku": "BLT-B48", "description": "V-belt B48", "qty": 120, "unit_price": 11.75, "gl_account": "6600 Repairs & Maintenance"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0330", "vendor_id": "V-1005", "issue_date": "2026-10-01", "currency": "USD",
+      "status": "open", "buyer": "Priya Nair (Workplace Ops)", "cost_center": "CC-410 Workplace", "receipt_required": false,
+      "description": "HQ facilities services, November 2026",
+      "lines": [
+        {"line_no": 1, "sku": "FM-JAN-MO", "description": "Janitorial services, November 2026", "qty": 1, "unit_price": 7850.00, "gl_account": "6300 Facilities"},
+        {"line_no": 2, "sku": "FM-WIN-QTR", "description": "Exterior window cleaning (quarterly)", "qty": 1, "unit_price": 1200.00, "gl_account": "6300 Facilities"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0356", "vendor_id": "V-1006", "issue_date": "2026-10-22", "currency": "USD",
+      "status": "open", "buyer": "Sofia Alvarez (E-commerce)", "cost_center": "CC-510 E-commerce", "receipt_required": true,
+      "description": "Holiday packaging run",
+      "lines": [
+        {"line_no": 1, "sku": "BOX-12108-2C", "description": "Custom corrugated shipping box 12x10x8, 2-colour print", "qty": 2000, "unit_price": 1.85, "gl_account": "5200 Packaging"},
+        {"line_no": 2, "sku": "TIS-2030-BR", "description": "Branded tissue paper 20x30 (ream)", "qty": 50, "unit_price": 42.00, "gl_account": "5200 Packaging"}
+      ]
+    },
+    {
+      "po_number": "PO-2026-0361", "vendor_id": "V-1007", "issue_date": "2026-10-30", "currency": "USD",
+      "status": "open", "buyer": "Hannah Brooks (People Team)", "cost_center": "CC-120 People", "receipt_required": false,
+      "description": "Q4 all-hands catering",
+      "lines": [
+        {"line_no": 1, "sku": "CAT-EVT", "description": "Event catering, Q4 all-hands (120 guests)", "qty": 1, "unit_price": 3450.00, "gl_account": "6700 Events"}
+      ]
+    }
+  ],
+  "goods_receipts": [
+    {"po_number": "PO-2026-0311", "line_no": 1, "qty_received": 40, "received_date": "2026-11-04", "grn": "GRN-88120"},
+    {"po_number": "PO-2026-0311", "line_no": 2, "qty_received": 12, "received_date": "2026-11-04", "grn": "GRN-88120"},
+    {"po_number": "PO-2026-0311", "line_no": 3, "qty_received": 6, "received_date": "2026-11-06", "grn": "GRN-88131"},
+    {"po_number": "PO-2026-0342", "line_no": 1, "qty_received": 3, "received_date": "2026-11-07", "grn": "POD-88213/19/27"},
+    {"po_number": "PO-2026-0342", "line_no": 2, "qty_received": 1, "received_date": "2026-11-07", "grn": "POD-88213/19/27"},
+    {"po_number": "PO-2026-0342", "line_no": 3, "qty_received": 3, "received_date": "2026-11-07", "grn": "POD-88213/19/27"},
+    {"po_number": "PO-2026-0275", "line_no": 1, "qty_received": 500, "received_date": "2026-10-03", "grn": "GRN-87702"},
+    {"po_number": "PO-2026-0275", "line_no": 2, "qty_received": 40, "received_date": "2026-10-03", "grn": "GRN-87702"},
+    {"po_number": "PO-2026-0275", "line_no": 3, "qty_received": 120, "received_date": "2026-10-03", "grn": "GRN-87702"},
+    {"po_number": "PO-2026-0356", "line_no": 1, "qty_received": 2000, "received_date": "2026-11-05", "grn": "GRN-88124"},
+    {"po_number": "PO-2026-0356", "line_no": 2, "qty_received": 50, "received_date": "2026-11-05", "grn": "GRN-88124"}
+  ],
+  "invoice_ledger": [
+    {"vendor_id": "V-1002", "invoice_number": "ATL-INV-1182", "invoice_date": "2026-09-30", "net_amount": 30000.00, "total_amount": 30000.00,
+     "po_number": "PO-2026-0287", "status": "paid", "posted_at": "2026-10-02", "payment_ref": "ACH-77104", "note": "200 hrs @ $150, September"},
+    {"vendor_id": "V-1004", "invoice_number": "INV 2026/0417", "invoice_date": "2026-10-08", "net_amount": 6010.00, "total_amount": 6543.39,
+     "po_number": "PO-2026-0275", "status": "paid", "posted_at": "2026-10-14", "payment_ref": "ACH-77812", "note": "Full PO billed"},
+    {"vendor_id": "V-1003", "invoice_number": "BLX-30544", "invoice_date": "2026-10-31", "net_amount": 2000.00, "total_amount": 2000.00,
+     "po_number": "PO-2026-0298", "status": "posted", "posted_at": "2026-11-03", "payment_ref": null, "note": "October storage"}
+  ]
+}

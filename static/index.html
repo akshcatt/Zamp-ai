@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ClearAP · Invoice to Decision</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231D4ED8'/><path d='M9 17l4.5 4.5L23 11' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <span class="logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M9 17l4.5 4.5L23 11" stroke="white" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span><b>ClearAP</b><small>Invoice → Decision</small></span>
+    </a>
+    <nav id="nav">
+      <a href="#/" data-route="dashboard">Dashboard</a>
+      <a href="#/inbox" data-route="inbox">Process invoice</a>
+      <a href="#/queue" data-route="queue">Review queue <span id="queue-count" class="pill-count" hidden></span></a>
+      <a href="#/data" data-route="data">POs &amp; ledger</a>
+      <a href="#/rules" data-route="rules">Rules &amp; process</a>
+    </nav>
+    <div class="mode" id="mode" title="Extraction engine"></div>
+  </header>
+  <main id="app"></main>
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
