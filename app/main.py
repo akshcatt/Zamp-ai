@@ -21,6 +21,7 @@ MAX_BYTES = 20 * 1024 * 1024
 
 app = FastAPI(title="Invoice-to-Decision", version="1.0")
 db.init()
+print(f"ClearAP ready: data={db.DATA_DIR} reader={'gemini ' + MODEL if llm_available() else 'heuristic (no GEMINI_API_KEY)'}", flush=True)
 
 
 @app.get("/api/health")

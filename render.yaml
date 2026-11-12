@@ -6,6 +6,8 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      - key: PORT
+        value: "10000"
       - key: GEMINI_API_KEY
         sync: false
       - key: AP_TODAY
