@@ -2,7 +2,7 @@
 
 **AI Solutions Analyst case study · PS-1 (Finance / AP)**
 
-ClearAP takes a vendor invoice PDF, digital or scanned, and returns one of three decisions:
+ClearAP takes a vendor invoice (a digital PDF, a scanned PDF, or a phone photo in JPG/PNG/HEIC) and returns one of three decisions:
 
 - **Approve:** posted to the ledger and scheduled for payment.
 - **Hold:** routed to the team that owns the problem, with an SLA.
@@ -26,7 +26,7 @@ No API key? It still runs. It falls back to a heuristic text parser, and scanned
 
 **Before a demo:** `.venv/bin/python scripts/smoke_llm.py` runs every sample against the real Gemini API and checks each decision against the expected one.
 
-**Tests:** `.venv/bin/python -m pytest -q tests` runs 19 end-to-end tests: every sample with a perfect reader, the heuristic path, policy changes, and re-submission.
+**Tests:** `.venv/bin/python -m pytest -q tests` runs 23 end-to-end tests: every sample with a perfect reader, the heuristic path, photo intake (JPG/PNG/HEIC), unsupported files, policy changes, and re-submission.
 
 ## Deploy (live link)
 
@@ -47,7 +47,7 @@ Storage is SQLite inside the container. On free tiers it resets on redeploy. Tha
 | `app/seed/master_data.json` | The "ERP": 8 vendors (one blocked), 8 POs, goods receipts, invoice history |
 | `app/main.py` | FastAPI: REST, plus Server-Sent Events for the live run view |
 | `static/` | The UI: dashboard, inbox, live run view, review queue, POs & ledger, rules & process |
-| `samples/` | 7 test invoices in 3 vendor layouts, including one image-only scan |
+| `samples/` | 8 test invoices in 3 vendor layouts, including an image-only scan and a phone photo (JPEG) |
 | `scripts/generate_samples.py` | Regenerates the test invoices |
 | `docs/DESIGN.md` | Process map, assumptions, rules, edge-case rationale, trade-offs, what's next |
 | `docs/DEMO_SCRIPT.md` | 5-minute video script, live-demo runbook, likely interview questions |
@@ -55,8 +55,8 @@ Storage is SQLite inside the container. On free tiers it resets on redeploy. Tha
 ## The pipeline
 
 ```
-PDF ─▶ 1 Intake ─▶ 2 Analysis ─▶ 3 AI extraction ─▶ 4 Validation ─▶ 5 Vendor ─▶ 6 Duplicates ─▶ 7 PO & receipts ─▶ 8 Decision
-       sha-256      digital vs     Gemini → schema     math, tax,       master,      exact file,       quoted or inferred PO,    reject > hold > approve
+PDF/photo ─▶ 1 Intake ─▶ 2 Analysis ─▶ 3 AI extraction ─▶ 4 Validation ─▶ 5 Vendor ─▶ 6 Duplicates ─▶ 7 PO & receipts ─▶ 8 Decision
+             type+sha-256 digital vs     Gemini → schema     math, tax,       master,      exact file,       quoted or inferred PO,    reject > hold > approve
                     scanned        + confidence        dates,           status,      normalised #,     line match, 3-way,        route to owner + SLA,
                                    (fallback: parser)  grounding        bank, domain queue, fuzzy      cumulative vs PO cap      payment plan / email
 ```
@@ -72,5 +72,6 @@ PDF ─▶ 1 Intake ─▶ 2 Analysis ─▶ 3 AI extraction ─▶ 4 Validation
 | Edge 4 | Keystone, **bank details changed** | Every number is perfect. The remit-to account and sender domain aren't | **Hold → Treasury & Fraud**, call back on the number on file |
 | Extra | Pinnacle, unbudgeted freight | +$45 (0.78%), inside the 2% / $500 tolerance | **Approve** with the variance noted |
 | Extra | Halcyon, no invoice # or date | Can't post or dedupe | **Reject**: returned to vendor with a drafted email |
+| Extra | Northwind, **phone photo** (JPEG) | Not a PDF at all: tilted, on a desk, uneven light | **Approve**: converted to PDF at intake, read like a scan |
 
 Approving posts to the ledger, so **running the same invoice twice is caught as a duplicate**. That's a good live moment.

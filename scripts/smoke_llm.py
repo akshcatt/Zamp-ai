@@ -31,7 +31,7 @@ from app.extract import MODEL, llm_available  # noqa: E402
 EXPECTED = {
     "01": ("APPROVE", None), "02": ("HOLD", "Procurement / Buyer"), "03": ("APPROVE", None),
     "04": ("REJECT", "Rejected: duplicate"), "05": ("HOLD", "Treasury & Fraud"),
-    "06": ("APPROVE", None), "07": ("REJECT", "Returned to vendor"),
+    "06": ("APPROVE", None), "07": ("REJECT", "Returned to vendor"), "08": ("APPROVE", None),
 }
 
 if not llm_available():
@@ -39,7 +39,7 @@ if not llm_available():
 db.init(reset=True)
 print(f"Model: {MODEL}\n")
 ok_all = True
-for pdf in sorted((ROOT / "samples").glob("*.pdf")):
+for pdf in sorted(p for p in (ROOT / "samples").iterdir() if p.suffix in (".pdf", ".jpg")):
     time.sleep(4)  # stay under free-tier requests-per-minute
     t0 = time.time()
     rid = pipeline.start_run(pdf.read_bytes(), pdf.name, "smoke")

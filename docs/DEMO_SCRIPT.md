@@ -5,7 +5,7 @@
 1. `cp .env.example .env` and put your free Gemini key in (https://aistudio.google.com/api-keys). Then `./run.sh` → open http://localhost:8000.
 2. `.venv/bin/python scripts/smoke_llm.py`. Every line must say PASS. It pauses between invoices to stay within free-tier rate limits. (It uses its own temporary database, so it won't touch the demo data.)
 3. On the Dashboard, click **Reset demo data**. This gives you a clean ledger and empty history.
-4. The top-right badge must read **Gemini · gemini-3.5-flash-lite** (green dot). If it says "Heuristic mode", the key isn't loaded.
+4. The top-right badge must read **Gemini · gemini-3.1-flash-lite** (green dot). If it says "Heuristic mode", the key isn't loaded.
 5. Rules page: confirm the defaults (2%, $500, $25,000, 0.85, 0.70, 45, 180, Yes).
 6. Browser at 110–125% zoom, notifications off, one tab, other windows closed.
 
@@ -62,6 +62,7 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
   - Run *Pinnacle*: it's now **held**, because the $45 freight is 0.78%, over the new limit.
   - Set it back to `2`.
   - Point: "The business owns the thresholds, not the code."
+- **If they send a phone photo:** drop it in too. JPG, PNG and iPhone HEIC are converted to a PDF at intake (sample 08 shows this).
 - **If they hand you a random invoice:** drop it in. An unknown vendor goes to Vendor Management (onboarding). A non-invoice is rejected. Either way it fails safe.
 - **Free-tier limits:** if a run shows "rate limit reached", wait about 60 seconds. Don't click *Run entire inbox* during the live demo; run invoices one at a time.
 - **Backup if Wi-Fi or the API dies:** the app keeps running in heuristic mode for digital PDFs, and the scan goes to manual keying. Say so; that *is* the design. Every past run can be re-animated with **↻ Replay** from its event log.

@@ -231,6 +231,40 @@ def rasterise_as_scan(pdf_bytes: bytes, seed: int = 7) -> bytes:
     return out.getvalue()
 
 
+def photograph(pdf_bytes: bytes, seed: int = 11) -> bytes:
+    """Make it look like a phone photo of a printed invoice: paper on a desk, tilted, uneven light, JPEG."""
+    import pypdfium2 as pdfium
+    from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+
+    rnd = random.Random(seed)
+    page = pdfium.PdfDocument(pdf_bytes)[0].render(scale=170 / 72).to_pil().convert("RGB")
+    pw, ph = page.size
+    W, H = int(pw * 1.22), int(ph * 1.16)
+    desk = Image.new("RGB", (W, H), (92, 74, 58))  # wooden desk tone
+    dpx = desk.load()
+    for _ in range(int(W * H * 0.01)):  # grain
+        x, y = rnd.randrange(W), rnd.randrange(H)
+        r, g, b = dpx[x, y]
+        k = rnd.randint(-14, 14)
+        dpx[x, y] = (r + k, g + k, b + k)
+    shadow = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(shadow).rectangle([int(W * .1) + 14, int(H * .07) + 18, int(W * .1) + pw + 14, int(H * .07) + ph + 18], fill=150)
+    desk.paste((40, 32, 25), mask=shadow.filter(ImageFilter.GaussianBlur(18)))
+    paper = page.rotate(-3.2, resample=Image.BICUBIC, expand=True, fillcolor=(0, 0, 0))
+    mask = Image.new("L", page.size, 255).rotate(-3.2, expand=True, fillcolor=0)
+    desk.paste(paper, (int(W * .1) - 20, int(H * .07) - 30), mask)
+    # uneven lighting: soft vignette, light falling off toward the edges and one corner
+    vig = Image.radial_gradient("L").resize((int(W * 1.5), int(H * 1.5))).crop((int(W * .15), int(H * .1), int(W * 1.15), int(H * 1.1)))
+    vig = vig.filter(ImageFilter.GaussianBlur(40))
+    desk = Image.composite(ImageEnhance.Brightness(desk).enhance(0.72), ImageEnhance.Brightness(desk).enhance(1.06), vig)
+    r, g, b = desk.split()  # warm indoor white balance
+    desk = Image.merge("RGB", (r.point(lambda v: min(255, int(v * 1.04))), g, b.point(lambda v: int(v * 0.92))))
+    desk = desk.filter(ImageFilter.GaussianBlur(0.8))
+    out = io.BytesIO()
+    desk.save(out, format="JPEG", quality=80)
+    return out.getvalue()
+
+
 # --------------------------------------------------------------------------- specs
 def totals(sub, tax=None, rate=None, ship=None, label_total="Total Due"):
     rows = [("Subtotal", money(sub), False)]
@@ -383,6 +417,25 @@ SAMPLES = [
         "totals": totals(3450.00, 306.19, "8.875%"),
         "notes": ["Thank you for choosing Halcyon!", "Remit to: Bank of America  Routing 026009593  Account 4830021175"],
     },
+    {
+        "file": "08_variant_phone_photo_northwind_NW-58377.jpg",
+        "id": "variant_phone_photo",
+        "kind": "Extra input",
+        "title": "Phone photo of a paper invoice",
+        "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. It's a 3-way match on a second Northwind PO, so it's approved.",
+        "layout": "modern", "accent": "#0E7C66", "photo": True,
+        "vendor_name": "Northwind Office Supplies Inc.",
+        "vendor_address": "88 Commerce Way, Secaucus, NJ 07094  ·  ar@northwindsupplies.com  ·  EIN 94-3127756",
+        "meta": [("Invoice #", "NW-58377"), ("Invoice Date", "Nov 10, 2026"), ("PO Number", "PO-2026-0368"),
+                 ("Terms", "Net 30"), ("Due Date", "Dec 10, 2026")],
+        "lines": [
+            {"description": "Whole-bean coffee 1 kg", "qty": 10, "unit_price": 24.00},
+            {"description": "Paper towels - case of 12 rolls", "qty": 8, "unit_price": 31.50},
+            {"description": "Disinfectant wipes 80 ct", "qty": 12, "unit_price": 7.25},
+        ],
+        "totals": totals(579.00, 51.39, "8.875%"),
+        "notes": ["Remit to: JPMorgan Chase Bank, N.A.  Routing 021000021  Account 000123454417"],
+    },
 ]
 
 
@@ -394,12 +447,14 @@ def main() -> None:
         pdf = render(spec)
         if spec.get("scan"):
             pdf = rasterise_as_scan(pdf)
+        if spec.get("photo"):
+            pdf = photograph(pdf)
         (OUT / spec["file"]).write_bytes(pdf)
         manifest.append({
             "file": spec["file"], "id": spec["id"], "kind": spec["kind"],
             "title": spec["title"],
             "vendor": spec["vendor_name"], "what_to_expect": spec["what_to_expect"],
-            "scanned": bool(spec.get("scan")),
+            "scanned": bool(spec.get("scan")), "photo": bool(spec.get("photo")),
         })
         print("wrote", spec["file"], f"{len(pdf)/1024:.0f} KB")
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))

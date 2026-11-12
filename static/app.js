@@ -126,18 +126,18 @@ async function viewInbox() {
   const kindCls = (k) => (k.startsWith("Edge") ? "edge" : k.startsWith("Extra") ? "extra" : "");
   app.innerHTML = `
   <div class="page-head">
-    <div><h1>Process an invoice</h1><p>Drop any invoice PDF (digital or scanned), or pick one from the test inbox. Each run streams live, stage by stage.</p></div>
+    <div><h1>Process an invoice</h1><p>Drop any invoice (a digital or scanned PDF, or a phone photo), or pick one from the test inbox. Each run streams live, stage by stage.</p></div>
     <button class="btn" id="runall">Run entire inbox</button>
   </div>
-  <label class="drop" id="drop"><input type="file" id="file" accept="application/pdf,.pdf" hidden>
-    <b>Drop an invoice PDF here</b><span class="muted">or click to choose a file (max 15 MB)</span></label>
+  <label class="drop" id="drop"><input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/heic,.heic,.jpg,.jpeg,.png,.webp" hidden>
+    <b>Drop an invoice here</b><span class="muted">PDF, or a photo (JPG, PNG, HEIC). Click to choose a file, max 20 MB.</span></label>
   <h2 style="margin-top:26px">Test inbox</h2>
   <div class="grid samples">${samples.map((s) => `
     <div class="card sample">
-      <div class="row"><span class="badge kind ${kindCls(s.kind)}">${esc(s.kind)}</span>${s.scanned ? `<span class="badge info">Scanned image</span>` : ""}</div>
+      <div class="row"><span class="badge kind ${kindCls(s.kind)}">${esc(s.kind)}</span>${s.scanned ? `<span class="badge info">Scanned image</span>` : ""}${s.photo ? `<span class="badge info">Phone photo</span>` : ""}</div>
       <div><div class="t">${esc(s.title)}</div><div class="v">${esc(s.vendor)}</div></div>
       <div class="x">${esc(s.what_to_expect)}</div>
-      <div class="row"><button class="btn primary sm" data-run="${esc(s.file)}">Run ▸</button><a class="btn sm" target="_blank" href="/api/samples/${encodeURIComponent(s.file)}">View PDF</a></div>
+      <div class="row"><button class="btn primary sm" data-run="${esc(s.file)}">Run ▸</button><a class="btn sm" target="_blank" href="/api/samples/${encodeURIComponent(s.file)}">${s.photo ? "View photo" : "View PDF"}</a></div>
     </div>`).join("")}</div>`;
   app.querySelectorAll("[data-run]").forEach((b) => (b.onclick = () => runSample(b.dataset.run)));
   const drop = $("#drop"), file = $("#file");
@@ -407,7 +407,7 @@ async function viewRules() {
   ];
   app.innerHTML = `<div class="page-head"><div><h1>Rules &amp; process</h1><p>How the process decides, in plain language. The AI reads the document; deterministic rules make every decision that touches money.</p></div></div>
   <div class="card pad"><h2>The process, step by step</h2><div class="flow">
-    ${[["Intake", "Fingerprint the file (SHA-256) so exact resubmissions are caught.", "System"],
+    ${[["Intake", "Detect the file type from its bytes (PDF, or a JPG/PNG/HEIC photo, which is auto-rotated and converted to PDF). Fingerprint it (SHA-256) so exact resubmissions are caught.", "System"],
        ["Document analysis", "Detect digital vs scanned. Scans are read visually, and the text cross-check is switched off.", "System"],
        ["AI extraction", "Gemini reads the invoice into a strict schema and scores its confidence per field. Blanks stay blank; nothing is guessed.", "AI"],
        ["Validation", "Arithmetic, tax plausibility, dates, required fields, and grounding: every key value must appear verbatim in the PDF text.", "Rules"],

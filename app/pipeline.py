@@ -233,18 +233,71 @@ def human_action(run_id: str, action: str, actor: str, note: str) -> dict:
 
 
 # ============================================================ stages
+FORMAT_NAMES = {"pdf": "PDF", "jpeg": "JPEG photo", "png": "PNG image", "webp": "WEBP image", "heic": "HEIC photo (iPhone)"}
+
+
+def detect_format(b: bytes) -> str | None:
+    """Identify the file by its magic bytes. Never trust the extension."""
+    if b[:5] == b"%PDF-":
+        return "pdf"
+    if b[:3] == b"\xff\xd8\xff":
+        return "jpeg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "webp"
+    if b[4:8] == b"ftyp" and b[8:12] in (b"heic", b"heix", b"hevc", b"heim", b"heis", b"mif1", b"msf1"):
+        return "heic"
+    return None
+
+
+def image_to_pdf(b: bytes) -> tuple[bytes, dict]:
+    """Normalise a photo into a one-page PDF so every downstream stage sees the same input type."""
+    from PIL import Image, ImageOps
+    try:
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+    except ImportError:
+        pass
+    img = Image.open(io.BytesIO(b))
+    orig = img.size
+    img = ImageOps.exif_transpose(img)  # phones store rotation in EXIF
+    img = img.convert("RGB")
+    img.thumbnail((2400, 2400))  # plenty for reading, keeps the request small
+    out = io.BytesIO()
+    img.save(out, format="PDF", resolution=200)
+    return out.getvalue(), {"original_px": f"{orig[0]}×{orig[1]}", "pdf_px": f"{img.size[0]}×{img.size[1]}"}
+
+
 def st_intake(ctx):
-    pdf = ctx["pdf"]
-    sha = hashlib.sha256(pdf).hexdigest()
+    raw = ctx["pdf"]
+    sha = hashlib.sha256(raw).hexdigest()  # fingerprint the file as received
     ctx["sha"] = sha
-    checks = []
-    is_pdf = pdf[:5] == b"%PDF-"
-    checks.append(chk("intake.format", "File is a PDF", "pass" if is_pdf else "fail",
-                      "Valid PDF header" if is_pdf else "File is not a PDF", None if is_pdf else "reject"))
-    if not is_pdf:
+    checks, data = [], {"filename": ctx["filename"], "bytes": len(raw), "sha256": sha}
+    fmt = detect_format(raw)
+    data["format"] = fmt
+    if fmt is None:
+        checks.append(chk("intake.format", "Supported file type", "fail",
+                          "Not a PDF or image (supported: PDF, JPG, PNG, WEBP, HEIC). Ask the sender for a PDF.", "reject"))
         ctx["halt"] = True
-    return {"summary": f"Received {ctx['filename']} ({len(pdf)/1024:.0f} KB). Fingerprint {sha[:12]}…",
-            "checks": checks, "data": {"filename": ctx["filename"], "bytes": len(pdf), "sha256": sha}}
+        return {"summary": f"Received {ctx['filename']}: unsupported file type.", "checks": checks, "data": data}
+    if fmt == "pdf":
+        checks.append(chk("intake.format", "Supported file type", "pass", "PDF document"))
+        summary = f"Received {ctx['filename']} ({len(raw)/1024:.0f} KB PDF). Fingerprint {sha[:12]}…"
+    else:
+        try:
+            pdf, info = image_to_pdf(raw)
+        except Exception as e:
+            checks.append(chk("intake.format", "Supported file type", "fail", f"Image could not be decoded ({e})", "hold", "ap"))
+            ctx["halt"] = True
+            return {"summary": "Image could not be decoded.", "checks": checks, "data": data}
+        ctx["pdf"] = pdf
+        (db.UPLOADS / f"{ctx['run_id']}.pdf").write_bytes(pdf)  # what the reviewer sees in the viewer
+        data.update(info)
+        checks.append(chk("intake.format", "Supported file type", "pass",
+                          f"{FORMAT_NAMES[fmt]} ({info['original_px']} px). Auto-rotated and converted to a one-page PDF, then read like a scan."))
+        summary = f"Received a {FORMAT_NAMES[fmt]} ({len(raw)/1024:.0f} KB). Converted to PDF for reading. Fingerprint {sha[:12]}…"
+    return {"summary": summary, "checks": checks, "data": data}
 
 
 def st_analyze(ctx):
@@ -264,7 +317,8 @@ def st_analyze(ctx):
     chars = sum(p["chars"] for p in pages_info)
     scanned = chars < 40
     ctx["scanned"] = scanned
-    kind = "Scanned image (no text layer)" if scanned else "Digital PDF (machine-readable text)"
+    photo = (ctx["trace"]["stages"].get("intake", {}).get("data", {}).get("format") or "pdf") != "pdf"
+    kind = ("Photo (no text layer)" if photo else "Scanned image (no text layer)") if scanned else "Digital PDF (machine-readable text)"
     if llm_available():
         path = ("Gemini reads the page image (vision). The text-grounding check is not possible."
                 if scanned else "Gemini reads the PDF. Extracted values are then grounded against the text layer.")
@@ -328,6 +382,15 @@ def _normalise(d: dict) -> dict:
         if isinstance(inv.get(k), str):
             inv[k] = inv[k].strip() or None
     inv["currency"] = (inv.get("currency") or "USD").upper()
+    # Reconcile a common reader slip: freight listed as a line item AND reported again as shipping.
+    ship, sub, tax, tot = inv.get("shipping_amount"), inv.get("subtotal"), inv.get("tax_amount") or 0, inv.get("total_amount")
+    if ship and sub is not None and tot is not None and not inv.get("tax_inclusive"):
+        line_sum = sum(li["amount"] or 0 for li in inv["line_items"])
+        in_lines = any(li["amount"] is not None and abs(li["amount"] - ship) < 0.005 for li in inv["line_items"])
+        if in_lines and abs(line_sum - sub) <= 0.05 and abs(sub + tax - tot) <= 0.05 and abs(sub + tax + ship - tot) > 0.05:
+            inv["shipping_amount"] = None
+            inv["extraction_warnings"] = list(inv.get("extraction_warnings") or []) + [
+                f"Shipping {ship:,.2f} was also listed as a line item and is already in the subtotal. Counted once."]
     inv["bank_details"] = inv.get("bank_details") or {}
     inv["field_confidence"] = inv.get("field_confidence") or {}
     return inv

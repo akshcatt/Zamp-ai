@@ -17,10 +17,11 @@ import re
 import time
 from datetime import datetime
 
-# gemini-3.5-flash-lite: free tier, stable, low latency, accepts PDF input natively.
-MODEL = os.environ.get("AP_GEMINI_MODEL", "gemini-3.5-flash-lite")
-FALLBACK_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash"]  # other free-tier Flash models, tried on overload
-TIMEOUT_MS = int(os.environ.get("AP_GEMINI_TIMEOUT_MS", "60000"))
+# gemini-3.1-flash-lite: free tier, reads PDFs (incl. scans/photos) natively, ~3 s per invoice in testing.
+# Measured 2026-11-12 on the free tier: 3.1-flash-lite ~3 s; 3.5-flash-lite 36 s or 503 (overloaded); 3.5-flash ~20-27 s.
+MODEL = os.environ.get("AP_GEMINI_MODEL", "gemini-3.1-flash-lite")
+FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash"]  # other free-tier models, tried in order on overload
+TIMEOUT_MS = int(os.environ.get("AP_GEMINI_TIMEOUT_MS", "30000"))  # hard per-model deadline
 
 NUM = {"type": ["number", "null"]}
 STR = {"type": ["string", "null"]}
@@ -52,7 +53,9 @@ EXTRACTION_SCHEMA = {
                 "properties": {"description": {"type": "string"}, "quantity": NUM, "unit_price": NUM, "amount": NUM},
             },
         },
-        "subtotal": NUM, "tax_amount": NUM, "tax_rate_pct": NUM, "shipping_amount": NUM, "total_amount": NUM,
+        "subtotal": NUM, "tax_amount": NUM, "tax_rate_pct": NUM,
+        "shipping_amount": {"type": ["number", "null"], "description": "Only a shipping/freight charge printed as its own row in the totals block. If freight appears as a line item, leave this null"},
+        "total_amount": NUM,
         "tax_inclusive": {"type": "boolean"},
         "bank_details": {
             "type": "object", "additionalProperties": False,
@@ -76,6 +79,7 @@ Rules:
 - Transcribe exactly what is printed. Never infer or invent a value that is not on the page. If a field is absent, return null. Example: no PO number printed means po_reference = null, even if you can guess one.
 - Numbers are plain decimals with no currency symbols or thousands separators. Dates are ISO YYYY-MM-DD. Interpret US-style dates (MM/DD/YYYY) as US unless the document clearly uses another convention.
 - line_items: one entry per printed line. amount is the printed line total.
+- shipping_amount is only for a shipping/freight row in the totals block (next to subtotal and tax). If freight is listed as a line item, it belongs in line_items only. Never count it twice.
 - tax_inclusive = true only if prices are stated to include tax.
 - bank_details: the remit-to details printed on this document. payment_instruction_notes: copy verbatim any sentence about where or how to pay, especially any announcement of changed bank details.
 - field_confidence: 0 to 1, how sure you are that the transcription is correct and complete. Use low values for blurry, cut-off or ambiguous text, and 1.0 for a field that is clearly absent (a confident null).
@@ -105,6 +109,32 @@ def _parse_json(text: str) -> dict:
             except json.JSONDecodeError:
                 pass
     raise ExtractionError("Model returned invalid JSON")
+
+
+class _Deadline(Exception):
+    pass
+
+
+def _with_deadline(fn, seconds: float):
+    """Hard wall-clock limit. The SDK's HTTP timeout doesn't cap a slow, trickling response,
+    so the call runs in a daemon thread and we stop waiting for it when the deadline passes."""
+    import threading
+    box = {}
+
+    def run():
+        try:
+            box["value"] = fn()
+        except BaseException as e:  # re-raised in the caller's thread
+            box["error"] = e
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise _Deadline(f"no response within {seconds:.0f}s")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
 
 
 def extract_with_gemini(pdf_bytes: bytes, text_layer: str) -> tuple[dict, dict]:
@@ -140,7 +170,10 @@ def extract_with_gemini(pdf_bytes: bytes, text_layer: str) -> tuple[dict, dict]:
     for model in models:
         for attempt in range(3):
             try:
-                resp, used = call(model), model
+                resp, used = _with_deadline(lambda: call(model), TIMEOUT_MS / 1000), model
+                break
+            except _Deadline as e:  # too slow right now: try the next model
+                last_err = f"timeout on {model}"
                 break
             except errors.ClientError as e:
                 code = getattr(e, "code", None)
@@ -159,11 +192,8 @@ def extract_with_gemini(pdf_bytes: bytes, text_layer: str) -> tuple[dict, dict]:
                         continue
                     break
                 raise ExtractionError(f"Gemini API error {code}: {getattr(e, 'message', e)}") from e
-            except errors.ServerError as e:  # 503 high demand / 500
+            except errors.ServerError as e:  # 503 high demand / 500: don't wait, move to the next model
                 last_err = f"{getattr(e, 'code', '5xx')} on {model}"
-                if attempt < 1:
-                    time.sleep(2)
-                    continue
                 break
             except errors.APIError as e:
                 raise ExtractionError(f"Gemini API error: {e}") from e

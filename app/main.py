@@ -17,7 +17,7 @@ from .extract import MODEL, llm_available
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "samples"
 STATIC = ROOT / "static"
-MAX_BYTES = 15 * 1024 * 1024
+MAX_BYTES = 20 * 1024 * 1024
 
 app = FastAPI(title="Invoice-to-Decision", version="1.0")
 db.init()
@@ -37,9 +37,10 @@ def samples():
 @app.get("/api/samples/{name}")
 def sample_file(name: str):
     p = (SAMPLES / name).resolve()
-    if p.parent != SAMPLES.resolve() or not p.exists() or p.suffix != ".pdf":
+    types = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+    if p.parent != SAMPLES.resolve() or not p.exists() or p.suffix.lower() not in types:
         raise HTTPException(404)
-    return FileResponse(p, media_type="application/pdf")
+    return FileResponse(p, media_type=types[p.suffix.lower()])
 
 
 @app.post("/api/runs")
@@ -50,11 +51,11 @@ async def create_run(file: UploadFile | None = File(None), sample: str | None = 
             raise HTTPException(404, "unknown sample")
         data, name, source = p.read_bytes(), sample, "sample inbox"
     elif file:
-        data, name, source = await file.read(), file.filename or "upload.pdf", "upload"
+        data, name, source = await file.read(), file.filename or "upload", "upload"
     else:
         raise HTTPException(400, "provide a file or a sample name")
     if len(data) > MAX_BYTES:
-        raise HTTPException(413, "file too large (15 MB max)")
+        raise HTTPException(413, "file too large (20 MB max)")
     if not data:
         raise HTTPException(400, "empty file")
     return {"run_id": pipeline.start_run(data, name, source)}

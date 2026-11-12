@@ -4,6 +4,7 @@ services:
     runtime: docker
     plan: free
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: GEMINI_API_KEY
         sync: false

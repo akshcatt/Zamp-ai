@@ -37,6 +37,7 @@ EXPECTED = {
     "edge_bank_change_fraud": ("HOLD", "Treasury & Fraud"),
     "variant_within_tolerance": ("APPROVE", None),
     "variant_missing_fields": ("REJECT", "Returned to vendor"),
+    "variant_phone_photo": ("APPROVE", None),
 }
 
 
@@ -178,9 +179,62 @@ def test_scan_without_llm_goes_to_manual_keying(env):
     assert r["decision"] == "HOLD" and r["route_to"] == "AP Specialist"
 
 
-def test_non_pdf_rejected(env, tmp_path):
+def test_unsupported_file_rejected(env, tmp_path):
     db, pl = env
-    p = tmp_path / "x.pdf"
-    p.write_bytes(b"hello, not a pdf")
+    p = tmp_path / "x.pdf"  # extension lies: content is what counts
+    p.write_bytes(b"PK\x03\x04 this is really a .docx")
     r = run_sync(pl, db, p)
     assert r["decision"] == "REJECT"
+    assert "Not a PDF or image" in r["trace"]["stages"]["intake"]["checks"][0]["detail"]
+
+
+def test_photo_is_converted_and_treated_as_scan(env, monkeypatch):
+    db, pl = env
+    spec = next(s for s in G.SAMPLES if s["id"] == "variant_phone_photo")
+    seen = {}
+    def fake(pdf, text):
+        seen["pdf_header"], seen["text"] = pdf[:5], text
+        return truth(spec), {"extractor": "truth"}
+    monkeypatch.setattr(pl, "llm_available", lambda: True)
+    monkeypatch.setattr(pl, "extract_with_gemini", fake)
+    r = run_sync(pl, db, ROOT / "samples" / spec["file"])
+    assert seen["pdf_header"] == b"%PDF-"          # reader receives a PDF, not the JPEG
+    assert seen["text"].strip() == ""               # no text layer -> scan path
+    assert r["trace"]["stages"]["analyze"]["data"]["scanned"] is True
+    assert (db.UPLOADS / f"{r['id']}.pdf").read_bytes()[:5] == b"%PDF-"  # viewer gets the converted PDF
+    assert r["decision"] == "APPROVE"
+
+
+def test_photo_without_llm_goes_to_manual_keying(env):
+    db, pl = env
+    spec = next(s for s in G.SAMPLES if s["id"] == "variant_phone_photo")
+    r = run_sync(pl, db, ROOT / "samples" / spec["file"])
+    assert r["decision"] == "HOLD" and r["route_to"] == "AP Specialist"
+
+
+def test_heic_and_png_detected(env, tmp_path):
+    from PIL import Image
+    import pillow_heif
+    db, pl = env
+    img = Image.new("RGB", (60, 40), "white")
+    for fmt, ext in (("PNG", "png"), ("HEIF", "heic")):
+        if fmt == "HEIF":
+            pillow_heif.register_heif_opener()
+        p = tmp_path / f"x.{ext}"
+        img.save(p, format=fmt)
+        assert pl.detect_format(p.read_bytes()) == ("png" if ext == "png" else "heic")
+        pdf, _ = pl.image_to_pdf(p.read_bytes())
+        assert pdf[:5] == b"%PDF-"
+
+
+def test_double_counted_shipping_is_reconciled(env, monkeypatch):
+    """Reader reports a freight line item AND the same amount as shipping: count it once, don't hold."""
+    db, pl = env
+    spec = next(s for s in G.SAMPLES if s["id"] == "variant_within_tolerance")
+    t = truth(spec)
+    t["shipping_amount"] = 45.0
+    monkeypatch.setattr(pl, "llm_available", lambda: True)
+    monkeypatch.setattr(pl, "extract_with_gemini", lambda pdf, text: (t, {"extractor": "truth"}))
+    r = run_sync(pl, db, ROOT / "samples" / spec["file"])
+    assert r["decision"] == "APPROVE", r["headline"]
+    assert r["trace"]["stages"]["po_match"]["data"]["variance"] == 45.0

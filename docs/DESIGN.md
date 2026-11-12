@@ -25,7 +25,7 @@ So the build optimises for two things:
 
 | # | Stage | Input → output | Decision points |
 |---|---|---|---|
-| 1 | Intake | PDF bytes → SHA-256 fingerprint | Not a PDF → reject |
+| 1 | Intake | File bytes → file type + SHA-256 fingerprint | Type detected from the bytes, not the extension. Photo (JPG/PNG/WEBP/HEIC) → auto-rotate, convert to a one-page PDF. Anything else → reject |
 | 2 | Document analysis | PDF → text layer + page stats | Scanned (no text) → vision path, grounding check off |
 | 3 | AI extraction | PDF → strict-schema JSON + per-field confidence | API down → cached extraction → heuristic parser → manual keying |
 | 4 | Validation | Fields → checks | Missing invoice #/date → return to vendor; math/tax/date/confidence/grounding issue → AP |
@@ -46,7 +46,7 @@ Routing priority when several teams have holds: **Treasury & Fraud → Controlle
   - per-field confidence, with a configurable floor;
   - a **grounding check**: on digital PDFs, the invoice number, total, PO and bank account must each appear verbatim in the text layer, or the invoice is held. That catches a model misread before it becomes a payment.
 
-**Model choice:** Google Gemini `gemini-3.5-flash-lite`. It's free-tier, stable, low-latency, and reads PDFs natively, including scanned page images. Extraction is a reading task, not a reasoning marathon, so a fast Flash-Lite model fits. Temperature is 0 for consistent reads. The model is env-configurable (`AP_GEMINI_MODEL`). The JSON schema is enforced by the API; if that's ever rejected, the call falls back to the schema in the prompt. Thinking is set to *minimal*, because transcription needs no deliberation and it's several times faster. Each request has a 60-second timeout. Free-tier models are sometimes overloaded (503) or rate-limited (429). In that case the call retries briefly, then falls back to another free Flash model (`gemini-3.1-flash-lite`, then `gemini-3.5-flash`). The model that actually answered is recorded on the run.
+**Model choice:** Google Gemini `gemini-3.1-flash-lite`. It's free-tier and reads PDFs natively, including scanned page images and photos. I measured the free-tier models on these invoices: `gemini-3.1-flash-lite` took about 3 s, `gemini-3.5-flash-lite` took 36 s or was overloaded (503), and `gemini-3.5-flash` took about 20–27 s. All read the fields correctly, so I picked the fastest. Extraction is a reading task, not a reasoning marathon, so a fast Flash-Lite model fits. Temperature is 0 for consistent reads. The model is env-configurable (`AP_GEMINI_MODEL`). The JSON schema is enforced by the API; if that's ever rejected, the call falls back to the schema in the prompt. Thinking is set to *minimal*, because transcription needs no deliberation and it's several times faster. Each model gets a hard 30-second wall-clock deadline. The SDK's HTTP timeout alone didn't stop a slow, trickling response, so the call runs in a thread and the pipeline stops waiting when the deadline passes. The worst case for a run is therefore bounded. Free-tier models are sometimes overloaded (503) or rate-limited (429). On a 503 the call moves straight to the next free model (`gemini-3.5-flash-lite`, then `gemini-3.5-flash`). On a 429 it waits once before moving on. The model that actually answered is recorded on the run.
 
 **Data note:** on Gemini's free tier, Google may use submitted content to improve its products. That's fine for these synthetic invoices. In production, use the paid tier or Vertex AI, where it isn't.
 
@@ -68,7 +68,7 @@ I picked edge cases that test **judgment and context**, not parsing tricks:
 
    The output is a hold for Treasury, an internal task to **call back on the phone number in the vendor master**, and an explicit "do not reply to the invoice's email". Payments only ever go to the master-file account. That's a control, not a check.
 
-Two extra inputs show the "close but not exact" and "communicate back" behaviours. Pinnacle has $45 of freight within tolerance, so it's approved with a note. Halcyon has no invoice number or date, so it's returned to the vendor with a drafted email.
+Three extra inputs show the "close but not exact", "communicate back" and "it isn't even a PDF" behaviours. Pinnacle has $45 of freight within tolerance, so it's approved with a note. Halcyon has no invoice number or date, so it's returned to the vendor with a drafted email. The Northwind phone photo (a JPEG of a printed invoice, tilted on a desk) is normalised to a PDF at intake, so every later stage sees one input type, and it's read like a scan.
 
 ## 5. Assumptions (stated, so they can be challenged)
 
