@@ -1177,8 +1177,16 @@ async function sendChat(text) {
 function openChat() {
   const h = chrome.health;
   $("#chat-sub").innerHTML = h && h.llm ? `Powered by Gemini · ${esc(h.model)} · read-only` : "Gemini isn't connected: set GEMINI_API_KEY on the server";
-  $("#chat").hidden = false; $("#open-chat").classList.add("on"); paintChat(); setTimeout(() => $("#chat-input").focus(), 30); }
-function closeChat() { $("#chat").hidden = true; $("#open-chat").classList.remove("on"); }
+  $("#chat").hidden = false; hideTeaser(true);
+  $("#chat-fab").classList.add("open"); $("#chat-fab").setAttribute("aria-expanded", "true"); $("#open-chat").classList.add("on"); paintChat(); setTimeout(() => $("#chat-input").focus(), 30); }
+function closeChat() { $("#chat").hidden = true; $("#open-chat").classList.remove("on"); $("#chat-fab").classList.remove("open"); $("#chat-fab").setAttribute("aria-expanded", "false"); }
+$("#chat-fab").onclick = () => ($("#chat").hidden ? openChat() : closeChat());
+// A one-time greeting so people notice the assistant; never again once dismissed or used.
+function hideTeaser(forever) { $("#chat-teaser").hidden = true; if (forever) store.set("nocap-teaser-seen", "1"); }
+$("#teaser-x").onclick = (e) => { e.stopPropagation(); hideTeaser(true); };
+$("#chat-teaser").onclick = () => openChat();
+if (!store.get("nocap-teaser-seen")) setTimeout(() => { if ($("#chat").hidden) { $("#chat-teaser").hidden = false; setTimeout(() => hideTeaser(false), 12000); } }, 2500);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#chat").hidden && $("#cmd").hidden && $("#modal").hidden) closeChat(); });
 $("#open-chat").onclick = () => ($("#chat").hidden ? openChat() : closeChat());
 $("#chat-close").onclick = closeChat;
 $("#chat-form").onsubmit = (e) => { e.preventDefault(); const i = $("#chat-input"); const v = i.value; i.value = ""; sendChat(v); };

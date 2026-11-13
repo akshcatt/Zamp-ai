@@ -67,6 +67,17 @@
     </form>
   </aside>
 
+  <div class="chat-teaser" id="chat-teaser" hidden role="status">
+    <button class="tx" id="teaser-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <b>👋 Hi, I'm NoCap</b>
+    <span>Ask me what's waiting for you, why an invoice was held, or how much we've protected.</span>
+  </div>
+  <button class="chat-fab" id="chat-fab" type="button" aria-controls="chat" aria-expanded="false">
+    <span class="fab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
+    <span class="fab-x"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
+    <span class="fab-t">Ask NoCap</span>
+  </button>
+
   <div id="cmd" class="cmd" hidden>
     <div class="cmd-box" role="dialog" aria-label="Search">
       <input id="cmd-input" placeholder="Search invoices, vendors, pages…" autocomplete="off" />
