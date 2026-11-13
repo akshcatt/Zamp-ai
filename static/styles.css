@@ -118,7 +118,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 36px 28px 80px; }
 .badge.APPROVE, .badge.pass { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-line); }
 .badge.HOLD, .badge.warn { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-line); }
 .badge.REJECT, .badge.fail { background: var(--bad-soft); color: var(--bad); border-color: var(--bad-line); }
-.badge.info, .badge.skip, .badge.running { background: var(--surface-2); color: var(--ink-2); border-color: var(--line); }
+.badge.info, .badge.skip, .badge.running, .badge.NOT_INVOICE { background: var(--surface-2); color: var(--ink-2); border-color: var(--line); }
 .badge.running::before { animation: pulse 1s ease-in-out infinite; }
 .badge.kind { background: var(--surface-2); color: var(--ink); border-color: var(--line); }
 .badge.kind.edge { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
@@ -302,6 +302,8 @@ table.mini th, table.mini td { padding: 7px 8px; font-size: 13px; }
 
 .decision { border-radius: var(--radius); padding: 24px; border: 1px solid var(--line); background: var(--surface); margin-bottom: 16px; position: relative; overflow: hidden; }
 .decision::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--line-strong); }
+.decision.NOT_INVOICE::before { background: var(--ink-3); }
+.decision.NOT_INVOICE { background: linear-gradient(90deg, var(--surface-2), var(--surface) 60%); }
 .decision.APPROVE::before { background: var(--ok); } .decision.HOLD::before { background: var(--warn); } .decision.REJECT::before { background: var(--bad); }
 .decision.APPROVE { background: linear-gradient(90deg, var(--ok-soft), var(--surface) 60%); }
 .decision.HOLD { background: linear-gradient(90deg, var(--warn-soft), var(--surface) 60%); }
@@ -462,6 +464,10 @@ td.pick { width: 40px; padding-right: 0; }
 code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+
+.linkish { border: 0; background: none; padding: 0; color: var(--ink-2); font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; display: block; margin-top: 2px; }
+.linkish:hover { color: var(--ink); }
+.notice .linkish { display: inline; font-size: inherit; font-weight: 500; color: inherit; }
 
 /* ---------- command palette */
 .cmd { position: fixed; inset: 0; z-index: 60; background: #0000004d; backdrop-filter: blur(3px); display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; }

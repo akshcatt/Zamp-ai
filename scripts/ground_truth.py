@@ -20,7 +20,7 @@ def truth(spec: dict) -> dict:
     email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", spec["vendor_address"] + " " + spec.get("vendor_contact", ""))
     change = next((n.lstrip("!") for n in spec.get("notes", []) if "changed banks" in n), None)
     return {
-        "document_type": "invoice", "vendor_name": spec["vendor_name"], "vendor_address": None, "vendor_tax_id": None,
+        "document_type": spec.get("doc_type", "invoice"), "vendor_name": spec["vendor_name"], "vendor_address": None, "vendor_tax_id": None,
         "vendor_email": email.group(0) if email else None, "vendor_phone": None, "bill_to_name": "Lumen Home Goods, Inc.",
         "invoice_number": inv_no, "invoice_date": parse(meta.get("Invoice Date") or meta.get("Date")), "due_date": None,
         "po_reference": po, "payment_terms": meta.get("Terms"), "currency": "USD",

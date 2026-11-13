@@ -262,12 +262,25 @@ def _find(patterns: list[str], text: str, flags=re.I) -> str | None:
     return None
 
 
+def _doc_type(text: str) -> str:
+    """Classify from the title words. Quote/statement wording wins only when the page never calls itself an invoice."""
+    if re.search(r"\binvoice\b|\bbill (?:no|number|#)", text, re.I):
+        return "invoice"
+    if re.search(r"\bquot(?:e|ation)\b|\bestimate\b|\bproforma\b", text, re.I):
+        return "quote"
+    if re.search(r"\bstatement of account\b|\baccount statement\b", text, re.I):
+        return "statement"
+    if re.search(r"\bpurchase order\b", text, re.I) and not re.search(r"total due|amount due|balance due", text, re.I):
+        return "purchase_order"
+    return "other"
+
+
 def extract_heuristic(text: str) -> tuple[dict, dict]:
     """Label-driven regex parser. Deliberately generic, not tuned per sample, and it reports low confidence."""
     if not text.strip():
         raise ExtractionError("No text layer and no LLM available (scanned document needs vision/OCR)")
     lines = [l.strip() for l in text.splitlines() if l.strip()]
-    first = re.sub(r"\s+(?:FREIGHT\s+|TAX\s+)?INVOICE$", "", lines[0], flags=re.I) if lines else None
+    first = re.sub(r"\s+(?:(?:FREIGHT\s+|TAX\s+)?INVOICE|QUOTATION|QUOTE|ESTIMATE|STATEMENT(?:\s+OF\s+ACCOUNT)?)$", "", lines[0], flags=re.I) if lines else None
     inv_no = _find([r"(?:Invoice\s*(?:#|No\.?|Number)|Bill\s*Number)\s*:?\s*([A-Z0-9][A-Z0-9\-/ ]{2,20}?)(?:\s{2,}|\s+(?:Invoice|Date|PO|Cust|Your|Terms|Period)\b|$)"], text, re.I | re.M)
     if inv_no and not re.search(r"\d", inv_no):  # a column header ('DATE'), not a number
         inv_no = None
@@ -308,7 +321,7 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
     change_note = _find([r"((?:we have changed banks|new bank|updated bank|change of bank)[^\n]*)"], text)
     terms = _find([r"Terms\s*:?\s*((?:\d+/\d+\s+)?Net\s*\d+)"], text)
     data = {
-        "document_type": "invoice" if re.search(r"invoice", text, re.I) else "other",
+        "document_type": _doc_type(text),
         "vendor_name": first, "vendor_address": None, "vendor_tax_id": _find([r"(?:EIN|FEIN|Tax ID)\s*:?\s*(\d{2}-\d{7})"], text),
         "vendor_email": email, "vendor_phone": None, "bill_to_name": "Lumen Home Goods, Inc." if "Lumen Home Goods" in text else None,
         "invoice_number": inv_no, "invoice_date": _to_date(date_raw), "due_date": None, "po_reference": po,

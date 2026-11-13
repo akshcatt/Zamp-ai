@@ -48,6 +48,11 @@ def is_superseded(r: dict) -> bool:
     return r.get("review_status") == "corrected"
 
 
+def is_invoice_run(r: dict) -> bool:
+    """Counts towards invoice metrics: not superseded by a correction, not a filed non-invoice."""
+    return not is_superseded(r) and r.get("decision") != "NOT_INVOICE"
+
+
 # ---------------------------------------------------------------- health & session
 @app.get("/healthz")
 def healthz():
@@ -158,8 +163,25 @@ async def create_batch(files: list[UploadFile] = File(...)):
 
 
 @app.get("/api/runs")
-def runs():
-    return db.list_runs()
+def runs(archived: str = "0"):
+    """archived=0 (default): the working list · 1: archived only · all: everything."""
+    return db.list_runs(archived={"0": False, "1": True, "all": None}.get(archived, False))
+
+
+class ActorBody(BaseModel):
+    actor: str = ""
+
+
+@app.post("/api/runs/archive")
+def archive(body: ActorBody, request: Request):
+    return {"archived": db.archive_resolved(actor_of(request, body.actor))}
+
+
+@app.post("/api/runs/{run_id}/restore")
+def restore(run_id: str, body: ActorBody, request: Request):
+    if not db.restore_run(run_id, actor_of(request, body.actor)):
+        raise HTTPException(400, "that run isn't archived")
+    return db.get_run(run_id)
 
 
 @app.get("/api/runs/{run_id}")
@@ -286,7 +308,9 @@ def _final(r: dict) -> str | None:
 
 @app.get("/api/stats")
 def stats():
-    rs = [r for r in db.list_runs(10000) if r["status"] != "running" and not is_superseded(r)]
+    finished = [r for r in db.list_runs(10000) if r["status"] != "running" and not is_superseded(r)]
+    rs = [r for r in finished if is_invoice_run(r)]
+    filed = len(finished) - len(rs)
     n = len(rs)
     by = {d: [r for r in rs if r["decision"] == d] for d in ("APPROVE", "HOLD", "REJECT")}
     val = lambda xs: round(sum(r["total"] or 0 for r in xs), 2)
@@ -306,7 +330,8 @@ def stats():
         "touchless_rate": round(100 * len(by["APPROVE"]) / n, 1) if n else 0,
         "value_processed": val(rs), "value_approved": val(by["APPROVE"]), "value_protected": round(prevented, 2),
         "avg_duration_ms": int(sum(durs) / len(durs)) if durs else 0,
-        "pending_review": sum(queues.values()), "queues": queues,
+        "pending_review": sum(queues.values()), "queues": queues, "filed": filed,
+        "archived": len(db.list_runs(10000, archived=True)),
     }
 
 
@@ -316,7 +341,7 @@ STAGE_ORDER = [k for k, _ in pipeline.STAGES]
 @app.get("/api/analytics")
 def analytics():
     """Everything the dashboard charts need, computed from the stored run traces."""
-    rs = [r for r in db.runs_for_analytics() if not is_superseded(r)]
+    rs = [r for r in db.runs_for_analytics() if is_invoice_run(r)]
     timeline, stage_ms, reasons, teams, vendors, readers = [], defaultdict(list), Counter(), defaultdict(Counter), defaultdict(lambda: [0, 0.0]), Counter()
     money = Counter()
     for r in rs:
@@ -362,7 +387,7 @@ def analytics():
 def vendors():
     """Vendor profiles: master data joined with everything the process has seen from each vendor."""
     m = db.master()
-    rs = [r for r in db.list_runs(10000) if r["status"] != "running" and not is_superseded(r)]
+    rs = [r for r in db.list_runs(10000, archived=None) if r["status"] != "running" and is_invoice_run(r)]
     ledger = db.ledger_rows()
     out = []
     for v in m["vendors"]:
@@ -396,11 +421,12 @@ def vendors():
 EXPORT_COLS = [("Received (UTC)", "created_at"), ("Run ID", "id"), ("Vendor", "vendor_name"), ("Vendor ID", "vendor_id"),
                ("Invoice #", "invoice_number"), ("PO", "po_number"), ("Amount", "total"), ("Currency", "currency"),
                ("Automated decision", "decision"), ("Routed to", "route_to"), ("Review", "review_status"),
-               ("Reason", "headline"), ("Read by", "extractor"), ("Seconds", "duration_ms"), ("File", "filename"), ("Source", "source")]
+               ("Reason", "headline"), ("Read by", "extractor"), ("Seconds", "duration_ms"), ("File", "filename"), ("Source", "source"),
+               ("Archived (UTC)", "archived_at")]
 
 
 def _export_rows():
-    for r in db.list_runs(10000):
+    for r in db.list_runs(10000, archived=None):
         row = dict(r)
         row["duration_ms"] = round((r["duration_ms"] or 0) / 1000, 2)
         yield [row.get(k) for _, k in EXPORT_COLS]
@@ -449,14 +475,14 @@ def export_xlsx():
     ws.append(["ClearAP export", db.now_iso()])
     ws["A1"].font = Font(bold=True, size=14)
     for k, v in [("Invoices handled", s["processed"]), ("Approved automatically", s["approved"]), ("Needs review", s["held"]),
-                 ("Rejected", s["rejected"]), ("Done automatically (%)", s["touchless_rate"]), ("Total value", s["value_processed"]),
+                 ("Rejected", s["rejected"]), ("Filed (not invoices)", s["filed"]), ("Done automatically (%)", s["touchless_rate"]), ("Total value", s["value_processed"]),
                  ("Money protected", s["value_protected"]), ("Waiting for a person", s["pending_review"])]:
         ws.append([k, v])
     ws.column_dimensions["A"].width, ws.column_dimensions["B"].width = 28, 22
 
     sheet(wb.create_sheet("Invoices"), [h for h, _ in EXPORT_COLS], _export_rows(), money_cols=("Amount",))
     exc = []
-    for r in db.runs_for_analytics(10000):
+    for r in db.runs_for_analytics(10000, include_archived=True):
         for k, st in (r["trace"].get("stages") or {}).items():
             for c in st.get("checks") or []:
                 if c.get("status") in ("fail", "warn"):

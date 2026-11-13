@@ -44,10 +44,12 @@ EXPECTED = {
     "edge_scanned_inferred_po": ("APPROVE", None), "edge_disguised_duplicate": ("REJECT", "Rejected: duplicate"),
     "edge_bank_change_fraud": ("HOLD", "Treasury & Fraud"), "variant_within_tolerance": ("APPROVE", None),
     "variant_missing_fields": ("REJECT", "Returned to vendor"), "variant_phone_photo": ("APPROVE", None),
+    "variant_not_an_invoice": ("NOT_INVOICE", "Filed: not an invoice"),
 }
 norm = lambda s: re.sub(r"[^A-Z0-9]", "", (s or "").upper())
 money_eq = lambda a, b: (a is None and b is None) or (a is not None and b is not None and abs(float(a) - float(b)) < 0.011)
 FIELDS = {
+    "Document type": lambda g, t: g.get("document_type") == t["document_type"],
     "Vendor name": lambda g, t: norm(t["vendor_name"])[:12] in norm(g.get("vendor_name")),
     "Invoice number": lambda g, t: norm(g.get("invoice_number")) == norm(t["invoice_number"]),
     "Invoice date": lambda g, t: g.get("invoice_date") == t["invoice_date"],
@@ -78,6 +80,8 @@ for spec in G.SAMPLES:
     got, t = ex.get("fields") or {}, truth(spec)
     scores = {}
     for name, fn in FIELDS.items():
+        if t["document_type"] != "invoice" and name != "Document type":
+            continue  # invoice fields don't apply to a quote/statement
         try:
             ok = bool(fn(got, t))
         except Exception:

@@ -72,9 +72,11 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
   - It re-runs through every rule as a new run. The original is kept and linked.
   - Point: "People fix the reading, never the rules."
 - **Bulk review:** in Needs review, tick several invoices, add one note, and Approve or Reject. Each is still checked on its own, and one that can't be actioned is reported, not silently skipped.
+- **Not an invoice:** run sample 09, a supplier quote. It's filed, not paid, and doesn't count as a rejection, so your exception rate stays honest. Point: "Not everything in an AP inbox is a bill."
+- **Archive:** Overview → **Archive finished** clears the board. Then re-run the clean invoice: it's still caught as a duplicate, because archiving never deletes history.
 - **Vendors:** open Vendors to show the Keystone card flagged *Bank-change attempt seen* and Meridian flagged *Sent a repeat invoice*: risk by vendor, not just by invoice.
 - **Exports:** Overview → Export → Excel gives sheets for Summary, Invoices, every Exception, and the Ledger. That's what an AP lead hands to finance.
-- **Accuracy question:** How it works → *How accurate is it?* shows 80/80 fields and 8/8 decisions on the samples. Be upfront that this is a smoke test on clean generated documents; the next step is real redacted invoices.
+- **Accuracy question:** How it works → *How accurate is it?* shows 89/89 fields and 9/9 decisions on the samples. Be upfront that this is a smoke test on clean generated documents; the next step is real redacted invoices.
 - **Free-tier limits:** if a run shows "rate limit reached", wait about 60 seconds. Don't click *Run all* during the live demo; run invoices one at a time.
 - **Backup if Wi-Fi or the API dies:** the app keeps running in heuristic mode for digital PDFs, and the scan goes to manual keying. Say so; that *is* the design. Every past run can be re-animated with **↻ Replay** from its event log.
 

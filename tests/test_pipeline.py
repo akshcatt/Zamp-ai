@@ -39,6 +39,7 @@ EXPECTED = {
     "variant_within_tolerance": ("APPROVE", None),
     "variant_missing_fields": ("REJECT", "Returned to vendor"),
     "variant_phone_photo": ("APPROVE", None),
+    "variant_not_an_invoice": ("NOT_INVOICE", "Filed: not an invoice"),
 }
 
 
@@ -120,7 +121,7 @@ def test_tolerance_policy_change_flips_decision(env, monkeypatch):
 
 
 HEURISTIC_OK = ["happy_path", "edge_split_po_overrun", "edge_disguised_duplicate", "edge_bank_change_fraud",
-                "variant_within_tolerance", "variant_missing_fields"]
+                "variant_within_tolerance", "variant_missing_fields", "variant_not_an_invoice"]
 
 
 @pytest.mark.parametrize("sid", HEURISTIC_OK)

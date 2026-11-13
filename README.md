@@ -26,11 +26,11 @@ No API key? It still runs. It falls back to a heuristic text parser, and scanned
 
 **Before a demo:** `.venv/bin/python scripts/smoke_llm.py` runs every sample against the real Gemini API and checks each decision against the expected one. **How it works → Check the AI connection** does a one-call check from the browser.
 
-**Benchmark:** `.venv/bin/python scripts/benchmark.py` scores what the AI read, field by field, against the exact data each sample was generated from, plus the final decision. Latest run: **80/80 fields, 8/8 decisions, ~3.5 s per read** with `gemini-3.1-flash-lite` ([docs/BENCHMARK.md](docs/BENCHMARK.md)). Eight clean synthetic documents is a smoke test, not proof; the page says so too.
+**Benchmark:** `.venv/bin/python scripts/benchmark.py` scores what the AI read, field by field, against the exact data each sample was generated from, plus the final decision. Latest run: **89/89 fields, 9/9 decisions, ~3 s per read** with `gemini-3.1-flash-lite` ([docs/BENCHMARK.md](docs/BENCHMARK.md)). Eight clean synthetic documents is a smoke test, not proof; the page says so too.
 
-**Tests:** `.venv/bin/python -m pytest -q tests` runs 34 tests:
+**Tests:** `.venv/bin/python -m pytest -q tests` runs 39 tests:
 - **Pipeline:** every sample through the pipeline with a perfect reader, the heuristic path, photo intake (JPG/PNG/HEIC), unsupported files, policy changes, re-submission, and persistence across a restart.
-- **HTTP API:** batch intake, correct-and-re-check, bulk review, restart recovery, vendor profiles, Excel/CSV export, health and security headers, and the login with CSRF and tamper-proof sessions.
+- **HTTP API:** batch intake, correct-and-re-check, bulk review, restart recovery, not-an-invoice filing, archive and restore (with duplicate protection kept), schema migration, vendor profiles, Excel/CSV export, health and security headers, and the login with CSRF and tamper-proof sessions.
 
 ## Features
 
@@ -40,6 +40,8 @@ No API key? It still runs. It falls back to a heuristic text parser, and scanned
 - **Correct & re-check:** a reviewer types or fixes the fields from the document (an unreadable scan, a misread total), and the invoice re-runs through every rule. The original is kept, marked superseded, and linked both ways in the history.
 - **Vendor profiles:** what each vendor has sent, what was approved, what's waiting, open purchase-order balance, and red flags (bank-change attempts, repeat invoices, blocked in the master).
 - **Analytics:** volume over time, outcome mix, top exception reasons, reviewer workload and turnaround, time per step, and reader mix. Every chart has hover detail and a table view.
+- **Not-an-invoice filing:** quotes, statements and purchase orders that land in the AP inbox are filed for reference, not rejected, and kept out of the approval and exception numbers. If one turns out to be a real bill, a reviewer corrects it and it's re-checked.
+- **Archive, don't delete:** "Archive finished" clears completed work off the working list and charts. Nothing is lost: the history, documents and payment record stay, archived invoices still block repeat submissions, and any of them can be restored. Invoices waiting for a person are never archived.
 - **Exports:** an Excel workbook (Summary, Invoices, every Exception, Ledger), CSV, and a full database backup.
 - **Accountability:** every human action records who and why. With sign-in on, the signed-in user is recorded and can't be spoofed from the browser.
 - **Resilience:** if the server restarts mid-run, that invoice is held for a person (never silently lost or paid); if the AI is down, a text parser takes over; if nothing can read the document, a person keys it in.

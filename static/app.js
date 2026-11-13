@@ -47,14 +47,14 @@ const icon = {
 };
 
 /* ------------------------------------------------------------------ plain-language vocabulary */
-const DEC_LABEL = { APPROVE: "Approved", HOLD: "Needs review", REJECT: "Rejected" };
+const DEC_LABEL = { APPROVE: "Approved", HOLD: "Needs review", REJECT: "Rejected", NOT_INVOICE: "Not an invoice" };
 const STATUS_LABEL = { pass: "OK", warn: "Heads-up", fail: "Problem", info: "FYI", skip: "Skipped" };
 // Backend queue/route names → the words a non-specialist would use.
 const FRIENDLY = {
   "Treasury & Fraud": "Fraud check team", "Controller approval": "Finance manager", "Procurement / Buyer": "Purchasing team",
   "Vendor Management": "Vendor setup team", "AP Specialist": "Accounts payable team",
   "Auto-approved → payment run": "Scheduled for payment", "Rejected: duplicate": "Blocked: already billed",
-  "Rejected: blocked vendor": "Blocked: vendor is on hold", "Returned to vendor": "Sent back to vendor", Rejected: "Rejected",
+  "Rejected: blocked vendor": "Blocked: vendor is on hold", "Returned to vendor": "Sent back to vendor", Rejected: "Rejected", "Filed: not an invoice": "Filed for reference",
 };
 const friendly = (n) => FRIENDLY[n] || n || "";
 const QUEUE_KEYS = { fraud: "Treasury & Fraud", controller: "Controller approval", procurement: "Procurement / Buyer", vendor_mgmt: "Vendor Management", ap: "AP Specialist" };
@@ -168,10 +168,12 @@ function paintWho() {
 const OUT = [["APPROVE", "Approved", "var(--c-ok)"], ["HOLD", "Needs review", "var(--c-hold)"], ["REJECT", "Rejected", "var(--c-bad)"]];
 const STAGE_NAME = Object.fromEntries(STAGES.map(([k, l]) => [k, l]));
 const READER_NAME = { gemini: "Gemini AI", heuristic: "Basic text reader", cache: "Re-used earlier AI read", manual: "Typed by a person", none: "Not read" };
-const dash = { filter: "all", q: "", tables: {} };
+const dash = { filter: "all", q: "", tables: {}, archived: false };
 
 async function viewDashboard() {
   const [s, runs, a] = await Promise.all([api("/api/stats"), api("/api/runs"), api("/api/analytics")]);
+  if (dash.archived && !s.archived) dash.archived = false;
+  const archivedRuns = dash.archived ? await api("/api/runs?archived=1") : [];
   refreshChrome();
   const pending = runs.filter((r) => r.decision === "HOLD" && (!r.review_status || r.review_status === "pending") && r.status !== "running");
   const tl = a.timeline;
@@ -204,7 +206,7 @@ async function viewDashboard() {
   </section>
 
   <div class="grid kpis">
-    ${kpi("Invoices handled", s.processed, `${kmoney(s.value_processed)} in total`, sparkline(spark.handled, "count", (v) => `${v} handled`), "Every invoice that has finished processing.")}
+    ${kpi("Invoices handled", s.processed, `${kmoney(s.value_processed)} in total${s.filed ? ` · ${s.filed} non-invoice${s.filed === 1 ? "" : "s"} filed` : ""}`, sparkline(spark.handled, "count", (v) => `${v} handled`), "Every invoice that has finished processing.")}
     ${kpi("Done automatically", s.processed ? s.touchless_rate + "%" : "—", `${s.approved} paid with no one touching them`, sparkline(spark.auto, "rate", (v) => `${v}% automatic so far`), "Share of invoices approved and scheduled for payment without a person stepping in. The line shows how that share moved, invoice by invoice.", "accent")}
     ${kpi("Waiting for a person", s.pending_review, pending.length ? (sla.late ? `${sla.late} past deadline` : "all within deadline") : "queue is clear", slaBar(sla), "Invoices on hold, split by how close they are to their review deadline.")}
     ${kpi("Stopped", s.rejected, "repeats, missing info, blocked vendors", sparkline(spark.stopped, "count", (v) => `${v} stopped so far`), "Invoices that should not be paid as sent.")}
@@ -228,12 +230,14 @@ async function viewDashboard() {
 
   <div class="grid dash-cols">
     <div class="card panel">
-      <div class="panel-head"><span class="t">Recent invoices</span>
+      <div class="panel-head"><div><span class="t">${dash.archived ? "Archived" : "Recent invoices"}</span>
+          ${s.archived || dash.archived ? `<button class="linkish" id="arch-toggle">${dash.archived ? "← Back to the working list" : `View archived (${s.archived})`}</button>` : ""}</div>
         <div class="toolbar">
           <label class="search">${icon.search}<input id="q" placeholder="Search vendor, invoice #, PO" value="${esc(dash.q)}"></label>
-          <div class="chips" id="chips">${[["all", "All"], ["APPROVE", "Approved"], ["HOLD", "Needs review"], ["REJECT", "Rejected"]].map(([k, l]) => `<button data-f="${k}" class="${dash.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
+          <div class="chips" id="chips">${[["all", "All"], ["APPROVE", "Approved"], ["HOLD", "Needs review"], ["REJECT", "Rejected"], ["NOT_INVOICE", "Filed"]].map(([k, l]) => `<button data-f="${k}" class="${dash.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
           <div class="menu"><button class="btn sm ghost" id="exp" aria-haspopup="true">${icon.download} Export</button>
             <div class="menu-pop" id="exp-pop" hidden><a href="/api/export.xlsx" download>Excel workbook <span class="faint">invoices, exceptions, ledger</span></a><a href="/api/export.csv" download>CSV <span class="faint">one row per invoice</span></a><button type="button" id="csv">CSV of this filtered view</button></div></div>
+          ${dash.archived ? "" : `<button class="btn sm ghost" id="archive" title="Move finished invoices off this list. Nothing is deleted.">Archive finished</button>`}
         </div></div>
       <div id="runs-table"></div>
     </div>
@@ -247,29 +251,36 @@ async function viewDashboard() {
       </div>
       <div class="card pad">
         <h3>Demo controls</h3>
-        <p class="muted small" style="margin:0 0 12px">Start over: clears every invoice and puts the records back to how they started.</p>
+        <p class="muted small" style="margin:0 0 12px">Start over: permanently clears every invoice and puts the records back to how they started. To tidy up without losing history, use <b>Archive finished</b> instead.</p>
         <button class="btn sm bad" id="reset">Reset demo data</button>
       </div>
     </div>
   </div>`;
 
-  const filtered = () => { const q = dash.q.trim().toLowerCase(); return runs.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
+  const base = dash.archived ? archivedRuns : runs;
+  const filtered = () => { const q = dash.q.trim().toLowerCase(); return base.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
       && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to)].join(" ").toLowerCase().includes(q))); };
   const paint = () => {
     const q = dash.q.trim().toLowerCase();
-    const rows = runs.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
+    const rows = base.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
       && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to)].join(" ").toLowerCase().includes(q)));
-    $("#runs-table").innerHTML = !runs.length
+    $("#runs-table").innerHTML = !base.length && dash.archived ? `<div class="empty">Nothing archived.</div>`
+      : !base.length
       ? `<div class="empty"><div class="big">No invoices yet</div>Upload one, or try the sample inbox.<br><br><a class="btn primary" href="#/inbox">${icon.upload} Upload an invoice</a></div>`
       : !rows.length ? `<div class="empty">No invoices match.</div>`
       : `<div class="table-wrap"><table>
-        <thead><tr><th>Vendor</th><th class="num">Amount</th><th>Result</th><th>Next step</th><th class="num">Received</th></tr></thead>
+        <thead><tr><th>Vendor</th><th class="num">Amount</th><th>Result</th><th>Next step</th><th class="num">Received</th>${dash.archived ? "<th></th>" : ""}</tr></thead>
         <tbody>${rows.map((r) => `<tr class="click" onclick="location.hash='#/runs/${r.id}'">
           <td class="vcell"><b>${esc(r.vendor_name || r.filename)}</b><div class="faint mono">${esc(r.invoice_number || "no invoice #")}${r.po_number ? " · " + esc(r.po_number) : ""}</div></td>
           <td class="num">${money(r.total)}</td>
           <td>${decBadge(r.decision, r.review_status, r.status)}</td>
           <td class="muted" style="white-space:nowrap">${esc(r.status === "running" ? "Checking now…" : friendly(r.route_to))}</td>
-          <td class="num faint" title="${esc(when(r.created_at))}">${ago(r.created_at)}</td></tr>`).join("")}</tbody></table></div>`;
+          <td class="num faint" title="${esc(when(r.created_at))}">${ago(r.created_at)}</td>
+          ${dash.archived ? `<td class="num"><button class="btn sm" data-restore="${r.id}">Restore</button></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
+    $$("[data-restore]").forEach((b) => (b.onclick = async (e) => {
+      e.stopPropagation();
+      try { await postJSON(`/api/runs/${b.dataset.restore}/restore`, { actor: reviewer() }); toast("Restored to the working list"); viewDashboard(); } catch (err) { toast(err.message); }
+    }));
   };
   paint();
   $("#q").oninput = (e) => { dash.q = e.target.value; paint(); };
@@ -283,6 +294,12 @@ async function viewDashboard() {
     card.classList.toggle("as-table", dash.tables[id]);
     b.textContent = dash.tables[id] ? "Chart" : "Table";
   }));
+  $("#arch-toggle") && ($("#arch-toggle").onclick = () => { dash.archived = !dash.archived; dash.filter = "all"; viewDashboard(); });
+  $("#archive") && ($("#archive").onclick = async () => {
+    if (!confirm("Archive every finished invoice?\n\nThey leave this list and the charts, but nothing is deleted: the history, documents and payment record stay, repeat invoices are still caught, and you can restore any of them. Invoices still waiting for a person are not archived.")) return;
+    try { const r = await postJSON("/api/runs/archive", { actor: reviewer() }); toast(r.archived ? `Archived ${r.archived} invoice${r.archived === 1 ? "" : "s"}` : "Nothing finished to archive"); viewDashboard(); }
+    catch (e) { toast(e.message); }
+  });
   $("#reset").onclick = async () => {
     if (!confirm("Clear all invoices and reset the records?")) return;
     await api("/api/reset", { method: "POST" }); toast("Demo data reset"); viewDashboard();
@@ -367,7 +384,7 @@ function mixChart(s, m) {
 function hbars(items, { fmt = (v) => v, color = () => "var(--c-bar)" } = {}) {
   const max = Math.max(...items.map((i) => i.value), 0) || 1;
   return `<div class="hbars">${items.map((it) => `<div class="hbar" data-ct="${esc(it.tip || `${esc(it.label)}: ${fmt(it.value)}`)}">
-      <div class="hbar-top"><span class="hbar-label">${esc(it.label)}</span><span class="hbar-val">${fmt(it.value)}</span></div>
+      <div class="hbar-top"><span class="hbar-label">${esc(it.label)}</span><span class="hbar-val">${fmt(it.value, it)}</span></div>
       <div class="hbar-track">${it.parts ? it.parts.filter((p) => p.v).map((p) => `<span style="width:${(100 * p.v) / max}%;background:${p.c}"></span>`).join("")
         : `<span style="width:${Math.max(1.5, (100 * it.value) / max)}%;background:${color(it)}"></span>`}</div></div>`).join("")}</div>`;
 }
@@ -564,7 +581,7 @@ async function viewRun(id, query) {
   const finish = async (r) => {
     r = r || (await api(`/api/runs/${id}`));
     st.run = r; st.running = false;
-    $("#rh-title").textContent = r.vendor_name ? `${r.vendor_name} · ${r.invoice_number || "no invoice #"}` : r.filename;
+    $("#rh-title").textContent = r.vendor_name ? `${r.vendor_name} · ${r.decision === "NOT_INVOICE" ? "not an invoice" : r.invoice_number || "no invoice #"}` : r.filename;
     $("#rh-meta").innerHTML = `${esc(r.filename)} · received ${when(r.created_at)} · checked in ${secs(r.duration_ms)} · read by <b>${esc(READER_NAME[r.extractor] || r.extractor || "nobody yet (needs keying)")}</b>`;
     render(); renderReview(st); refreshChrome();
   };
@@ -611,6 +628,7 @@ function renderTimeline(st) {
 
 function plainSentence(d) {
   const team = friendly(d.route_name);
+  if (d.decision === "NOT_INVOICE") return "Nothing to pay. This isn't a bill, so it's filed for reference and doesn't count as a rejection. If it really is an invoice, correct the details below to re-check it.";
   if (d.decision === "APPROVE") return "Everything checked out. It has been recorded and scheduled for payment, and nobody had to touch it.";
   if (d.decision === "HOLD") return `Something needs a person to look at it. It's waiting with the ${team.toLowerCase()}${d.sla ? `, who should answer within ${d.sla.toLowerCase()}` : ""}. Nothing gets paid until they do.`;
   if ((d.route_name || "").includes("duplicate")) return "Don't pay this. We have already been billed for it, so paying it again would mean paying twice.";
@@ -660,8 +678,8 @@ function renderDetail(st) {
   else if (st.tab === "data") body = `<div class="panel-body">${stageData(s, st)}</div>`;
   else if (s.key === "decision") {
     const fired = st.order.filter((k) => k !== "decision").flatMap((k) => (st.stages[k].checks || []).filter((c) => c.status === "fail" || c.status === "warn").map((c) => ({ ...c, label: `${st.stages[k].label} · ${c.label}` })));
-    body = `<div class="panel-body"><p style="margin:0 0 14px">${fired.length ? (fired.length === 1 ? "This check shaped the decision:" : `These ${fired.length} checks shaped the decision:`) : "Every check passed, so nobody needed to step in."}</p>${checksHtml(fired)}
-      <p class="faint small" style="margin:16px 0 0">How the decision is made: if any check says <b>reject</b>, it's rejected. Otherwise, if any check needs a person, it goes to the team best placed to fix it. Otherwise it's approved. The AI never makes this call.</p></div>`;
+    body = `<div class="panel-body"><p style="margin:0 0 14px">${st.decision?.decision === "NOT_INVOICE" ? "This document isn't an invoice, so the invoice checks (vendor, repeats, order match) were skipped and it was filed." : fired.length ? (fired.length === 1 ? "This check shaped the decision:" : `These ${fired.length} checks shaped the decision:`) : "Every check passed, so nobody needed to step in."}</p>${checksHtml(fired)}
+      <p class="faint small" style="margin:16px 0 0">How the decision is made: if it isn't an invoice at all, it's <b>filed</b>. If any check says <b>reject</b>, it's rejected. Otherwise, if any check needs a person, it goes to the team best placed to fix it. Otherwise it's approved. The AI never makes this call.</p></div>`;
   }
   else body = `<div class="panel-body"><p class="faint small" style="margin:0 0 6px">${esc(s.what)}</p>${s.summary ? `<p style="margin:0 0 14px">${esc(s.summary)}</p>` : ""}${checksHtml(s.checks || []) || `<div class="faint">Nothing to check in this step.</div>`}</div>`;
   el.innerHTML = `<div class="panel-head"><span class="t">${esc(s.label)}</span>
@@ -743,8 +761,12 @@ function renderReview(st) {
     : fromRun ? `<div class="notice">These details were typed in by a reviewer from the document. <a href="#/runs/${fromRun}">See the original attempt →</a></div>` : "";
   const audit = (r.audit || []).length ? `<div class="card pad" style="margin-top:16px"><h3>History</h3><ul class="audit">${r.audit.map((a) => `<li><span class="mono faint">${when(a.ts)}</span> · <b>${esc(a.actor)}</b> · ${esc(a.action.replace(/_/g, " "))}${a.note ? `: ${esc(a.note)}` : ""}</li>`).join("")}</ul></div>` : "";
   const pending = r.decision === "HOLD" && (!r.review_status || r.review_status === "pending");
+  const misfiled = r.decision === "NOT_INVOICE" && !r.review_status;
+  const archived = r.archived_at ? `<div class="notice">Archived ${when(r.archived_at)}. It's off the working list but kept for audit, and it still counts when checking for repeat invoices. <button class="linkish" id="restore">Restore it</button></div>` : "";
   const notes = QUICK_NOTES[r.route_to] || [];
-  el.innerHTML = links + (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
+  el.innerHTML = archived + links + (misfiled ? `<div class="card pad" style="margin-top:16px"><h3>Is this actually an invoice?</h3>
+      <p class="muted small" style="margin:0 0 12px">If the vendor is really asking to be paid, type the details from the document. It will be re-checked against every rule, like any invoice.</p>
+      <button class="btn" id="fix">${icon.edit} Correct details &amp; re-check</button></div><div id="fix-form"></div>` : "") + (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
       <p class="muted small" style="margin:0 0 10px">${esc(TEAM_WHY[r.route_to] || "")}</p>
       <textarea id="note" placeholder="Required: what did you check, and why are you approving or rejecting it? This is saved to the history."></textarea>
       ${notes.length ? `<div class="quick">${notes.map((n) => `<button type="button" data-n="${esc(n)}">${esc(n.length > 58 ? n.slice(0, 56) + "…" : n)}</button>`).join("")}</div>` : ""}
@@ -752,6 +774,8 @@ function renderReview(st) {
         <button class="btn ghost" id="fix">${icon.edit} Correct details &amp; re-check</button>
         <span class="faint small" style="margin-left:auto">Recorded as <b>${esc(reviewer() || "AP Reviewer")}</b></span></div></div></div>
       <div id="fix-form"></div>` : "") + audit;
+  if (misfiled) $("#fix").onclick = () => renderFixForm(st);
+  $("#restore") && ($("#restore").onclick = async () => { try { st.run = await postJSON(`/api/runs/${r.id}/restore`, { actor: reviewer() }); toast("Restored"); renderReview(st); } catch (e) { toast(e.message); } });
   if (pending) {
     $$(".quick button", el).forEach((b) => (b.onclick = () => { $("#note").value = b.dataset.n; $("#note").focus(); }));
     const act = async (action) => {
@@ -962,7 +986,7 @@ async function viewRules() {
     el.innerHTML = `<h2>How accurate is it?</h2>
       <p class="muted small" style="margin-top:-6px">Measured on ${esc(bm.run_on)} with ${esc(bm.model)}: every sample through the full process, then compared with the exact data each document was made from.</p>
       <div class="bench-top"><div><b>${bm.fields_correct}/${bm.fields_total}</b><span>fields read correctly</span></div><div><b>${bm.decisions_correct}/${bm.samples}</b><span>right decision &amp; team</span></div><div><b>${bm.median_read_seconds ?? "—"} s</b><span>typical AI read</span></div></div>
-      ${hbars(bm.by_field.map((f) => ({ label: f.field, value: f.correct, tip: `${esc(f.field)}: ${f.correct}/${f.total}` })), { fmt: (v) => `${v}/${bm.samples}`, color: () => "var(--c-ok)" })}
+      ${hbars(bm.by_field.map((f) => ({ label: f.field, value: f.correct, total: f.total, tip: `${esc(f.field)}: ${f.correct}/${f.total}` })), { fmt: (v, it) => `${v}/${it.total}`, color: () => "var(--c-ok)" })}
       <p class="faint small chart-note">Honest caveat: ${bm.samples} clean, generated documents is a smoke test, not proof. Real supplier invoices are messier; the next step is a labelled set of real (redacted) invoices.</p>`;
   }).catch(() => {});
   $("#save").onclick = async () => {

@@ -180,6 +180,8 @@ def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None) -> 
         if dec["decision"] == "APPROVE":
             _post(ctx, "auto-approved")
             db.add_audit(run_id, "system", "auto_approved", dec["headline"])
+        elif dec["decision"] == "NOT_INVOICE":
+            db.add_audit(run_id, "system", "filed", dec["headline"])
         else:
             db.add_audit(run_id, "system", dec["decision"].lower(), dec["headline"])
         _emit(run_id, "run_end", decision=dec["decision"], duration_ms=int((time.time() - t_start) * 1000))
@@ -242,8 +244,9 @@ def rekey(run_id: str, fields: dict, actor: str, note: str) -> str:
     run = db.get_run(run_id)
     if not run:
         raise ValueError("run not found")
-    if run["decision"] != "HOLD" or run.get("review_status") not in (None, "pending"):
-        raise ValueError("only invoices waiting for review can be corrected")
+    misfiled = run["decision"] == "NOT_INVOICE" and run.get("review_status") is None
+    if not misfiled and (run["decision"] != "HOLD" or run.get("review_status") not in (None, "pending")):
+        raise ValueError("only invoices waiting for review (or documents filed as not-an-invoice) can be corrected")
     if not note.strip():
         raise ValueError("a note is required. It goes into the audit trail.")
     clean = {k: fields.get(k) for k in MANUAL_FIELDS}
@@ -444,7 +447,14 @@ def st_validate(ctx):
     elif dt == "credit_note":
         checks.append(chk("val.doctype", "Is an invoice", "fail", "This is a credit note. It goes to the credits workflow, not payment.", "hold", "ap"))
     else:
-        checks.append(chk("val.doctype", "Is an invoice", "fail", f"Document looks like a '{dt}', not an invoice", "reject"))
+        # Quotes, statements, POs, receipts, delivery notes: nothing to pay, and nothing wrong with the sender.
+        # File them instead of rejecting, so they don't inflate rejection/exception metrics, and stop here:
+        # invoice checks (required fields, PO match, duplicates) don't apply to a non-invoice.
+        label = DOC_TYPE_NAMES.get(dt, dt or "unknown document")
+        ctx["not_invoice"] = label
+        ctx["halt"] = True
+        checks.append(chk("val.doctype", "Is an invoice", "info", f"This is a {label}, not an invoice. Filed for reference; nothing to pay.", "file"))
+        return {"summary": f"Not an invoice: this is a {label}. Filed, not paid.", "checks": checks, "data": {}}
 
     # required fields
     missing_vendor_fix = [f for f, lbl in (("invoice_number", "invoice number"), ("invoice_date", "invoice date")) if not inv.get(f)]
@@ -888,6 +898,10 @@ def st_po_match(ctx):
                                        "po_state": {k: v for k, v in stt.items() if k != "prior_invoices"}}}
 
 
+DOC_TYPE_NAMES = {"quote": "quote", "statement": "statement of account", "purchase_order": "purchase order",
+                  "receipt": "receipt", "other": "document that isn't an invoice"}
+
+
 def st_decision(ctx):
     trace = ctx["trace"]
     all_checks = [c for k, s in trace["stages"].items() for c in s.get("checks", [])]
@@ -900,7 +914,15 @@ def st_decision(ctx):
     P = ctx["policy"]
     out = {"reasons": [], "next_actions": [], "vendor_email": None, "internal_task": None, "payment": None}
 
-    if rejects:
+    if ctx.get("not_invoice"):
+        label = ctx["not_invoice"]
+        out["decision"] = "NOT_INVOICE"
+        out["route_name"] = "Filed: not an invoice"
+        out["headline"] = f"Filed, not paid: this is a {label}, not an invoice."
+        out["reasons"] = [f"The document reads as a {label}. There is no amount due to pay."]
+        out["next_actions"] = ["Kept on file for reference. It doesn't count towards invoice approval or exception rates.",
+                               "If it is actually an invoice, open it and use Correct details & re-check."]
+    elif rejects:
         out["decision"] = "REJECT"
         primary = rejects[0]
         out["reasons"] = [c["detail"] for c in rejects] + [f"Also noted: {c['detail']}" for c in holds]

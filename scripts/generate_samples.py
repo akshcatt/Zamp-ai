@@ -436,6 +436,26 @@ SAMPLES = [
         "totals": totals(579.00, 51.39, "8.875%"),
         "notes": ["Remit to: JPMorgan Chase Bank, N.A.  Routing 021000021  Account 000123454417"],
     },
+    {
+        "file": "09_variant_quote_pinnacle_Q-2291.pdf",
+        "id": "variant_not_an_invoice",
+        "kind": "Extra input",
+        "doc_type": "quote",
+        "title": "Not an invoice: a supplier quote",
+        "what_to_expect": "Filed, not paid. A vendor sent a price quote to the AP inbox. It has prices and a total, but it isn't a bill, so there's nothing to pay and nothing wrong with the sender. It's filed for reference and kept out of the rejection numbers. If it ever turns out to be a real invoice, a reviewer can correct it and re-check.",
+        "layout": "industrial", "doc_title": "QUOTATION",
+        "vendor_name": "Pinnacle Print & Packaging LLC",
+        "vendor_address": "41 Industrial Pkwy, Hicksville, NY 11801",
+        "vendor_contact": "sales@pinnacleprint.com  ·  (516) 555-0148",
+        "meta": [("Quote No.", "Q-2291"), ("Quote Date", "Nov 11, 2026"), ("Valid Until", "Dec 11, 2026"), ("Terms", "Net 30")],
+        "lines": [
+            {"description": "Custom mailer box 9x6x3, 1-colour", "qty": 5000, "unit_price": 0.92},
+            {"description": "Die / plate setup (one-time)", "qty": 1, "unit_price": 350.00},
+        ],
+        "totals": totals(4950.00, label_total="Quote Total"),
+        "notes": ["This is a quotation, not a request for payment. Prices are valid for 30 days.",
+                  "To accept, please issue a purchase order referencing Q-2291."],
+    },
 ]
 
 

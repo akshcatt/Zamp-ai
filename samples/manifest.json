@@ -78,5 +78,15 @@
     "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. It's a 3-way match on a second Northwind PO, so it's approved.",
     "scanned": false,
     "photo": true
+  },
+  {
+    "file": "09_variant_quote_pinnacle_Q-2291.pdf",
+    "id": "variant_not_an_invoice",
+    "kind": "Extra input",
+    "title": "Not an invoice: a supplier quote",
+    "vendor": "Pinnacle Print & Packaging LLC",
+    "what_to_expect": "Filed, not paid. A vendor sent a price quote to the AP inbox. It has prices and a total, but it isn't a bill, so there's nothing to pay and nothing wrong with the sender. It's filed for reference and kept out of the rejection numbers. If it ever turns out to be a real invoice, a reviewer can correct it and re-check.",
+    "scanned": false,
+    "photo": false
   }
 ]

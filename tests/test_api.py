@@ -181,3 +181,61 @@ def test_login_session_and_csrf(monkeypatch):
     c.cookies.clear()
     c.cookies.set("clearap_session", tampered)  # signature no longer matches
     assert c.get("/api/runs").status_code == 401
+
+
+def test_non_invoice_is_filed_not_rejected(monkeypatch):
+    """A quote reaches the AP inbox: filed, not paid, and kept out of the invoice metrics."""
+    c, *_ = make_client(monkeypatch)
+    q = run_sample(c, "variant_not_an_invoice")
+    assert q["decision"] == "NOT_INVOICE" and q["route_to"] == "Filed: not an invoice"
+    assert "quote" in q["headline"] and q["review_status"] is None
+    assert q["trace"]["stages"]["po_match"].get("skipped")       # invoice checks don't run on a non-invoice
+    assert q["audit"][-1]["action"] == "filed"
+    run_sample(c, "happy_path")
+    s = c.get("/api/stats").json()
+    assert s["processed"] == 1 and s["rejected"] == 0 and s["filed"] == 1 and s["touchless_rate"] == 100.0
+    assert all(t["decision"] != "NOT_INVOICE" for t in c.get("/api/analytics").json()["timeline"])
+    # safety valve: if it was really an invoice, a reviewer can key it in and re-check
+    r = c.post(f"/api/runs/{q['id']}/rekey", json={"invoice_number": "Q-2291", "total_amount": 4950, "vendor_name": "Pinnacle Print & Packaging LLC",
+                                                    "note": "Vendor confirmed this is their bill"})
+    assert r.status_code == 200, r.text
+    assert wait(c, r.json()["run_id"])["extractor"] == "manual"
+
+
+def test_archive_keeps_audit_and_duplicate_protection(monkeypatch):
+    c, db, _ = make_client(monkeypatch)
+    paid = run_sample(c, "happy_path")
+    held = run_sample(c, "edge_bank_change_fraud")
+    res = c.post("/api/runs/archive", json={"actor": "Priya"}).json()
+    assert res["archived"] == 1                                          # the pending hold is never archived
+    assert [r["id"] for r in c.get("/api/runs").json()] == [held["id"]]
+    assert [r["id"] for r in c.get("/api/runs?archived=1").json()] == [paid["id"]]
+    assert len(c.get("/api/runs?archived=all").json()) == 2
+    a = c.get(f"/api/runs/{paid['id']}").json()
+    assert a["archived_at"] and a["audit"][-1] == {**a["audit"][-1], "actor": "Priya", "action": "archived"}
+    # an archived invoice still blocks a resubmission
+    again = run_sample(c, "happy_path")
+    assert again["decision"] == "REJECT" and again["route_to"] == "Rejected: duplicate"
+    assert c.get("/api/stats").json()["archived"] == 1
+    # exports keep everything
+    assert c.get("/api/export.csv").text.count("\n") == 4
+    # restore
+    assert c.post(f"/api/runs/{paid['id']}/restore", json={}).status_code == 200
+    assert c.post(f"/api/runs/{paid['id']}/restore", json={}).status_code == 400
+    assert any(r["id"] == paid["id"] for r in c.get("/api/runs").json())
+
+
+def test_old_database_is_migrated(monkeypatch):
+    import sqlite3
+    tmp = tempfile.mkdtemp()
+    con = sqlite3.connect(Path(tmp) / "ap.db")
+    con.execute("CREATE TABLE runs (id TEXT PRIMARY KEY, created_at TEXT, finished_at TEXT, filename TEXT, source TEXT, sha256 TEXT,"
+                " status TEXT, decision TEXT, route_to TEXT, headline TEXT, vendor_id TEXT, vendor_name TEXT, invoice_number TEXT,"
+                " total REAL, currency TEXT, po_number TEXT, duration_ms INTEGER, extractor TEXT, review_status TEXT, trace_json TEXT, events_json TEXT)")
+    con.execute("INSERT INTO runs (id, created_at, status, decision, trace_json, events_json) VALUES ('R-old', '2026-11-01T00:00:00+00:00', 'done', 'APPROVE', '{}', '[]')")
+    con.commit(); con.close()
+    monkeypatch.setenv("DATA_DIR", tmp)
+    import app.db as db
+    importlib.reload(db)
+    db.init()
+    assert db.list_runs()[0]["id"] == "R-old" and db.list_runs()[0]["archived_at"] is None

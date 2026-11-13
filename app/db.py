@@ -85,7 +85,7 @@ def _schema() -> list[str]:
           sha256 TEXT, status TEXT, decision TEXT, route_to TEXT, headline TEXT,
           vendor_id TEXT, vendor_name TEXT, invoice_number TEXT, total DOUBLE PRECISION, currency TEXT,
           po_number TEXT, duration_ms BIGINT, extractor TEXT, review_status TEXT,
-          trace_json TEXT, events_json TEXT)""",
+          trace_json TEXT, events_json TEXT, archived_at TEXT)""",
         f"""CREATE TABLE IF NOT EXISTS ledger (
           id {pk}, vendor_id TEXT, invoice_number TEXT, invoice_number_norm TEXT,
           invoice_date TEXT, net_amount DOUBLE PRECISION, total_amount DOUBLE PRECISION, po_number TEXT, status TEXT,
@@ -112,6 +112,9 @@ def init(reset: bool = False) -> None:
                 q(f"DROP TABLE IF EXISTS {t}")
         for stmt in _schema():
             q(stmt)
+        # additive migration for databases created before archiving existed
+        if "archived_at" not in {c["name"] for c in q("PRAGMA table_info(runs)", fetch="all")}:
+            q("ALTER TABLE runs ADD COLUMN archived_at TEXT")
         if q("SELECT COUNT(*) AS n FROM ledger", fetch="one")["n"] == 0:
             for e in master()["invoice_ledger"]:
                 q("INSERT INTO ledger (vendor_id, invoice_number, invoice_number_norm, invoice_date, net_amount, total_amount,"
@@ -203,10 +206,34 @@ def get_run(run_id: str) -> dict | None:
     return d
 
 
-def list_runs(limit: int = 200) -> list[dict]:
+def list_runs(limit: int = 200, archived: bool | None = False) -> list[dict]:
+    """archived=False: the working list (default). True: only archived. None: everything (exports, vendor history)."""
+    where = {False: "WHERE archived_at IS NULL", True: "WHERE archived_at IS NOT NULL", None: ""}[archived]
     return q("SELECT id, created_at, finished_at, filename, source, status, decision, route_to, headline, vendor_id, vendor_name,"
-             " invoice_number, total, currency, po_number, duration_ms, extractor, review_status FROM runs"
+             f" invoice_number, total, currency, po_number, duration_ms, extractor, review_status, archived_at FROM runs {where}"
              " ORDER BY created_at DESC, id DESC LIMIT ?", (limit,), fetch="all")
+
+
+def archive_resolved(actor: str) -> int:
+    """Clear finished work off the working lists. Nothing is deleted: archived runs keep their trace, documents
+    and audit trail, and still count for duplicate detection and PO balances (the ledger is untouched).
+    Invoices still waiting for a person are never archived."""
+    rows = q("SELECT id FROM runs WHERE archived_at IS NULL AND status != 'running'"
+             " AND NOT (decision = 'HOLD' AND (review_status IS NULL OR review_status = 'pending'))", fetch="all")
+    ts = now_iso()
+    for r in rows:
+        q("UPDATE runs SET archived_at = ? WHERE id = ?", (ts, r["id"]))
+        add_audit(r["id"], actor, "archived", "Moved off the working list. Kept for audit and duplicate checks.")
+    return len(rows)
+
+
+def restore_run(run_id: str, actor: str) -> bool:
+    r = q("SELECT archived_at FROM runs WHERE id = ?", (run_id,), fetch="one")
+    if not r or not r["archived_at"]:
+        return False
+    q("UPDATE runs SET archived_at = NULL WHERE id = ?", (run_id,))
+    add_audit(run_id, actor, "restored", "Back on the working list.")
+    return True
 
 
 def runs_with_sha(sha: str, exclude: str) -> list[dict]:
@@ -221,9 +248,10 @@ def open_runs_for_vendor(vendor_id: str, exclude: str) -> list[dict]:
              " AND (review_status IS NULL OR review_status = 'pending')", (vendor_id, exclude), fetch="all")
 
 
-def runs_for_analytics(limit: int = 5000) -> list[dict]:
+def runs_for_analytics(limit: int = 5000, include_archived: bool = False) -> list[dict]:
+    extra = "" if include_archived else " AND archived_at IS NULL"
     rows = q("SELECT id, created_at, finished_at, decision, review_status, route_to, total, vendor_name, duration_ms,"
-             " extractor, trace_json FROM runs WHERE status != 'running' ORDER BY created_at, id LIMIT ?", (limit,), fetch="all")
+             f" extractor, trace_json FROM runs WHERE status != 'running'{extra} ORDER BY created_at, id LIMIT ?", (limit,), fetch="all")
     for r in rows:
         r["trace"] = json.loads(r.pop("trace_json") or "{}")
     return rows
