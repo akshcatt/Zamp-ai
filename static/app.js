@@ -219,6 +219,7 @@ window.addEventListener("hashchange", router);
 async function refreshChrome() {
   try {
     const [h, s] = await Promise.all([api("/api/health"), api("/api/stats")]);
+    chrome.health = h;
     const m = $("#mode");
     m.className = "mode" + (h.llm ? "" : " off");
     m.innerHTML = `<span class="dot"></span>${h.llm ? `AI on · ${esc(h.model)}` : "AI off · basic reader"}`;
@@ -244,7 +245,7 @@ function milestones(s) {
     { k: "century", name: "Century", desc: "Handle 100 invoices", have: s.processed, need: 100, ic: "💯" },
   ].map((m) => ({ ...m, done: (m.have || 0) >= m.need, pct: Math.min(100, Math.round((100 * (m.have || 0)) / m.need)) }));
 }
-const chrome = { pending: null, stats: null };
+const chrome = { pending: null, stats: null, health: null };
 function paintMomentum(s) {
   chrome.stats = s;
   const ms = milestones(s), won = ms.filter((m) => m.done);
@@ -1156,7 +1157,8 @@ function paintChat() {
   const log = $("#chat-log");
   log.innerHTML = (chat.msgs.length ? "" : `<div class="bubble bot"><p>Hi${reviewer() ? " " + esc(reviewer().split(" ")[0]) : ""}! I'm <b>NoCap</b>, your AP sidekick. Ask me about invoices, vendors, the review queue or the money we've protected. I read the live data; I can't approve or pay anything.</p></div>
       <div class="chips">${SUGGEST.map((q) => `<button class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`)
-    + chat.msgs.map((m) => `<div class="bubble ${m.role === "user" ? "me" : "bot"}">${m.role === "user" ? `<p>${esc(m.text)}</p>` : md(m.text)}</div>`).join("")
+    + chat.msgs.map((m) => `<div class="bubble ${m.role === "user" ? "me" : "bot"}">${m.role === "user" ? `<p>${esc(m.text)}</p>` : md(m.text)}</div>`
+      + (m.role === "bot" ? `<div class="by">${m.model ? `${icon.spark}Gemini · ${esc(m.model)}${m.ms ? ` · ${secs(m.ms)}` : ""}` : "Basic answer · Gemini wasn't available"}</div>` : "")).join("")
     + (chat.busy ? `<div class="bubble bot typing"><i></i><i></i><i></i></div>` : "");
   $$(".chip", log).forEach((c) => (c.onclick = () => sendChat(c.dataset.q)));
   log.scrollTop = log.scrollHeight;
@@ -1165,11 +1167,17 @@ async function sendChat(text) {
   text = (text || "").trim();
   if (!text || chat.busy) return;
   chat.msgs.push({ role: "user", text }); chat.busy = true; paintChat();
-  try { const r = await postJSON("/api/chat", { messages: chat.msgs.slice(-10) }); chat.msgs.push({ role: "bot", text: r.answer }); }
+  try {
+    const r = await postJSON("/api/chat", { messages: chat.msgs.slice(-10).map(({ role, text }) => ({ role, text })) });
+    chat.msgs.push({ role: "bot", text: r.answer, model: r.model, ms: r.ms });
+  }
   catch (e) { chat.msgs.push({ role: "bot", text: "Sorry, I couldn't answer that just now: " + e.message }); }
   chat.busy = false; paintChat(); $("#chat-input").focus();
 }
-function openChat() { $("#chat").hidden = false; $("#open-chat").classList.add("on"); paintChat(); setTimeout(() => $("#chat-input").focus(), 30); }
+function openChat() {
+  const h = chrome.health;
+  $("#chat-sub").innerHTML = h && h.llm ? `Powered by Gemini · ${esc(h.model)} · read-only` : "Gemini isn't connected: set GEMINI_API_KEY on the server";
+  $("#chat").hidden = false; $("#open-chat").classList.add("on"); paintChat(); setTimeout(() => $("#chat-input").focus(), 30); }
 function closeChat() { $("#chat").hidden = true; $("#open-chat").classList.remove("on"); }
 $("#open-chat").onclick = () => ($("#chat").hidden ? openChat() : closeChat());
 $("#chat-close").onclick = closeChat;

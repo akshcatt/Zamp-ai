@@ -654,3 +654,5 @@ code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2)
   .donut { align-self: center; }
 }
 .ask-btn svg, .kbd-btn svg { flex: none; width: 16px; height: 16px; }
+.by { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; margin: -6px 0 0 4px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+.by svg { width: 11px; height: 11px; color: var(--accent); }
