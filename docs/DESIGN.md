@@ -112,5 +112,5 @@ There is no vendor master to load or maintain. Vendors are learned:
 ## Discounts and round-offs
 
 - A discount row in the totals ("Less: Trade Discount @ 5%") is read as `discount_amount`; totals must reconcile as subtotal − discount + GST + shipping, the GST slab is checked on the discounted value, and a PO match notes that the lines match before the discount.
-- Indian invoices round the payable to the nearest rupee. A total that differs from the computed amount by up to `round_off_max` (₹1) is accepted when a Round Off row explains it or the total is a whole rupee; anything larger is held as a real mismatch.
-- Repeat-invoice amount matching uses the same ₹1 tolerance.
+- Indian invoices round the payable to the nearest rupee. A gap of up to ₹1 explained by a Round Off row (or a whole-rupee total) is shown as a round-off.
+- **Small differences are never a threat.** Any amount gap up to `small_difference_max` (₹10, editable on the Rules page) passes with a note, everywhere amounts are compared: line maths, lines vs subtotal, the invoice total, price vs PO (including after a discount), cumulative PO billing, and repeat-invoice amount matching. Larger gaps are checked by the normal rules (the PO price tolerance is still 2% / ₹40,000).

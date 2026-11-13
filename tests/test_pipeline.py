@@ -279,9 +279,29 @@ def test_round_off_without_a_printed_line_and_real_mismatch(env, monkeypatch):
     assert r["decision"] == "APPROVE" and "no round-off line printed" in _check(r, "val.total")["detail"]
 
 
-def test_total_off_by_more_than_a_round_off_is_held(env, monkeypatch):
+def test_differences_up_to_10_rupees_are_not_a_threat(env, monkeypatch):
+    def seven(t):
+        t["total_amount"] = t["total_amount"] + 7  # ₹7 off: rounding, not a problem
+        t["round_off"] = None
+    r = _truth_run(env, monkeypatch, "variant_phone_photo", seven)  # a photo: no text layer to compare the edited total with
+    assert r["decision"] == "APPROVE", r["headline"]
+    assert "treated as rounding" in _check(r, "val.total")["detail"]
+
+
+def test_small_price_difference_vs_po_is_ignored(env, monkeypatch):
+    def nudge(t):  # vendor bills ₹6 over the PO on one line (amounts stay internally consistent)
+        t["line_items"][0]["amount"] += 6
+        t["line_items"][0]["unit_price"] = t["line_items"][0]["amount"] / t["line_items"][0]["quantity"]
+        t["subtotal"] += 6
+        t["total_amount"] += 6
+    r = _truth_run(env, monkeypatch, "variant_phone_photo", nudge)
+    assert r["decision"] == "APPROVE", r["headline"]
+    assert "treated as rounding" in _check(r, "po.price")["detail"]
+
+
+def test_total_off_by_more_than_10_rupees_is_held(env, monkeypatch):
     def wrong(t):
-        t["total_amount"] = t["total_amount"] + 7  # ₹7 is not rounding
+        t["total_amount"] = t["total_amount"] + 15
         t["round_off"] = None
     r = _truth_run(env, monkeypatch, "happy_path", wrong)
-    assert r["decision"] == "HOLD" and "more than a round-off" in _check(r, "val.total")["detail"]
+    assert r["decision"] == "HOLD" and "more than the ₹10.00 allowed" in _check(r, "val.total")["detail"]

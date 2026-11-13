@@ -1111,6 +1111,7 @@ async function viewRules() {
   const fields = [
     ["price_tolerance_pct", "Price wiggle room (%)", "How far an invoice can be off the order before a person looks"],
     ["price_tolerance_abs", "Price wiggle room (₹)", "…and in rupees. Whichever is smaller wins."],
+    ["small_difference_max", "Ignore small differences up to (₹)", "Gaps this small are rounding, never a problem: totals, line maths, PO prices and repeat checks"],
     ["high_value_threshold", "Manager sign-off above (₹)", "Big invoices get a second look even when everything matches"],
     ["inferred_po_min_confidence", "How sure we must be of a guessed PO", "0 to 1. Below this, the buyer confirms which order it is"],
     ["min_field_confidence", "How sure the AI must be", "0 to 1. Key fields below this go to a person to double-check"],
@@ -1126,7 +1127,7 @@ async function viewRules() {
     ["Order match", "Find the purchase order (quoted or worked out), compare each line's price and quantity, check goods arrived, and check the order isn't over-billed.", "Rules"],
     ["Decision", "Any reason to reject → Rejected. Anything a person must see → sent to the right team with a deadline. Otherwise → approved and scheduled for payment.", "Rules"]];
   const terms = [["Purchase order (PO)", "What we agreed to buy and at what price, before the invoice arrives."], ["3-way match", "Invoice, order and goods-received note all agree."],
-    ["Goods receipt (GRN)", "Proof that the warehouse actually received the items."], ["Tolerance", "Small differences we accept automatically, like a few cents of rounding."],
+    ["Goods receipt (GRN)", "Proof that the warehouse actually received the items."], ["Tolerance", "Small differences we accept automatically. Anything up to ₹10 is treated as rounding, never a problem."],
     ["Duplicate", "The same bill sent twice, sometimes with the number written a bit differently."], ["Remit-to bank", "The account the money is sent to. We only ever pay the one on file."],
     ["GL code", "The accounting category the spend is booked under, e.g. \"6120 Breakroom\"."], ["Split billing", "One order billed across several invoices that together exceed the order."],
     ["Touchless", "Handled from start to finish with no person involved."]];
