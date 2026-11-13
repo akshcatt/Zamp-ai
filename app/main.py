@@ -8,7 +8,7 @@ import json
 import os
 import time
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, demo, pipeline, security
+from . import chat, db, demo, pipeline, security
 from .extract import MODEL, llm_available
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,12 +27,12 @@ MAX_BYTES = 20 * 1024 * 1024
 MAX_BATCH = 25
 VERSION = (os.environ.get("RENDER_GIT_COMMIT") or "dev")[:7]
 
-app = FastAPI(title="ClearAP · Invoice to Decision", version="1.1", docs_url="/api/docs", redoc_url=None)
+app = FastAPI(title="NoCap · Invoice to Decision", version="1.1", docs_url="/api/docs", redoc_url=None)
 app.add_middleware(security.SecurityMiddleware)
 db.init()
 _recovered = db.recover_interrupted()
 _demo = demo.start()
-print(f"ClearAP ready: db={db.DB_PATH} reader={'gemini ' + MODEL if llm_available() else 'heuristic (no GEMINI_API_KEY)'}"
+print(f"NoCap ready: db={db.DB_PATH} reader={'gemini ' + MODEL if llm_available() else 'heuristic (no GEMINI_API_KEY)'}"
       f" login={'on' if security.AUTH_ENABLED else 'off'} recovered={len(_recovered)} version={VERSION}"
       f" autoload={_demo['autoloaded']} keep_awake={_demo['keep_awake']}", flush=True)
 
@@ -282,7 +282,7 @@ class Rekey(BaseModel):
     due_date: str | None = Field(None, max_length=20)
     po_reference: str | None = Field(None, max_length=80)
     payment_terms: str | None = Field(None, max_length=80)
-    currency: str | None = Field("USD", max_length=8)
+    currency: str | None = Field("INR", max_length=8)
     vendor_email: str | None = Field(None, max_length=200)
     subtotal: float | None = None
     tax_amount: float | None = None
@@ -334,7 +334,41 @@ def stats():
         "avg_duration_ms": int(sum(durs) / len(durs)) if durs else 0,
         "pending_review": sum(queues.values()), "queues": queues, "filed": filed,
         "archived": len(db.list_runs(10000, archived=True)),
+        **momentum(rs),
     }
+
+
+REVIEW_ACTIONS = ("approved_override", "rejected", "corrected")
+
+
+def momentum(rs: list[dict]) -> dict:
+    """Progress signals for the sidebar and milestones: decisions people made, and how many days in a row."""
+    days = {}
+    for a in db.human_reviews():
+        if a["action"] in REVIEW_ACTIONS:
+            d = (a["ts"] or "")[:10]
+            days[d] = days.get(d, 0) + 1
+    today = datetime.now(timezone.utc).date()
+    streak, d = 0, today if today.isoformat() in days else today - timedelta(days=1)
+    while d.isoformat() in days:
+        streak, d = streak + 1, d - timedelta(days=1)
+    return {
+        "reviews_today": days.get(today.isoformat(), 0), "reviews_total": sum(days.values()), "streak_days": streak,
+        "duplicates_blocked": sum(1 for r in rs if r["decision"] == "REJECT" and (r["route_to"] or "").startswith("Rejected: duplicate")),
+        "fraud_held": sum(1 for r in rs if r["decision"] == "HOLD" and r["route_to"] == "Treasury & Fraud"),
+    }
+
+
+class ChatIn(BaseModel):
+    messages: list[dict] = Field(default_factory=list, max_length=30)
+
+
+@app.post("/api/chat")
+def ask_clearap(body: ChatIn):
+    msgs = [{"role": m.get("role"), "text": str(m.get("text", ""))[:2000]} for m in body.messages if isinstance(m, dict)]
+    if not msgs or msgs[-1]["role"] != "user" or not msgs[-1]["text"].strip():
+        raise HTTPException(400, "Ask a question first.")
+    return chat.answer(msgs, stats())
 
 
 STAGE_ORDER = [k for k, _ in pipeline.STAGES]
@@ -474,7 +508,7 @@ def export_xlsx():
     s = stats()
     ws = wb.active
     ws.title = "Summary"
-    ws.append(["ClearAP export", db.now_iso()])
+    ws.append(["NoCap export", db.now_iso()])
     ws["A1"].font = Font(bold=True, size=14)
     for k, v in [("Invoices handled", s["processed"]), ("Approved automatically", s["approved"]), ("Needs review", s["held"]),
                  ("Rejected", s["rejected"]), ("Filed (not invoices)", s["filed"]), ("Done automatically (%)", s["touchless_rate"]), ("Total value", s["value_processed"]),

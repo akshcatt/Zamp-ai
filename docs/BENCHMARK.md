@@ -5,7 +5,7 @@ Ground truth is the exact data each document was rendered from; it is read only 
 
 - **Fields read correctly:** 89/89 (100.0%)
 - **Decisions and routing correct:** 9/9 (100.0%)
-- **Median AI read time:** 2.7 s
+- **Median AI read time:** 4.5 s
 
 | Field | Correct |
 | --- | --- |
@@ -23,15 +23,15 @@ Ground truth is the exact data each document was rendered from; it is read only 
 
 | Sample | Fields | Decision | Expected | Misses |
 | --- | --- | --- | --- | --- |
-| 01_happy_northwind_NW-58213.pdf | 11/11 | APPROVE | APPROVE | — |
-| 02_edge_split_billing_atlas_ATL-INV-1209.pdf | 11/11 | HOLD | HOLD | — |
-| 03_edge_scanned_no_po_brightline_BLX-30871.pdf | 11/11 | APPROVE | APPROVE | — |
-| 04_edge_disguised_duplicate_meridian_INV-2026-0417.pdf | 11/11 | REJECT | REJECT | — |
-| 05_edge_bank_change_keystone_KFM-2026-1147.pdf | 11/11 | HOLD | HOLD | — |
-| 06_variant_tolerance_pinnacle_PPP-7734.pdf | 11/11 | APPROVE | APPROVE | — |
-| 07_variant_missing_fields_halcyon.pdf | 11/11 | REJECT | REJECT | — |
-| 08_variant_phone_photo_northwind_NW-58377.jpg | 11/11 | APPROVE | APPROVE | — |
-| 09_variant_quote_pinnacle_Q-2291.pdf | 1/1 | NOT_INVOICE | NOT_INVOICE | — |
+| 01_happy_sahyadri_SOS-58213.pdf | 11/11 | APPROVE | APPROVE | — |
+| 02_edge_split_billing_kaveri_KCS-INV-1209.pdf | 11/11 | HOLD | HOLD | — |
+| 03_edge_scanned_no_po_ganga_GFC-30871.pdf | 11/11 | APPROVE | APPROVE | — |
+| 04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf | 11/11 | REJECT | REJECT | — |
+| 05_edge_bank_change_kesari_KFS-2026-1147.pdf | 11/11 | HOLD | HOLD | — |
+| 06_variant_tolerance_pragati_PPP-7734.pdf | 11/11 | APPROVE | APPROVE | — |
+| 07_variant_missing_fields_annapurna.pdf | 11/11 | REJECT | REJECT | — |
+| 08_variant_phone_photo_sahyadri_SOS-58377.jpg | 11/11 | APPROVE | APPROVE | — |
+| 09_variant_quote_pragati_Q-2291.pdf | 1/1 | NOT_INVOICE | NOT_INVOICE | — |
 
 Caveat: 8 synthetic documents is a smoke-level benchmark, not a statistical claim. Real vendor invoices are messier;
 the next step is a labelled set of real (redacted) invoices from the customer.

@@ -21,11 +21,24 @@ from reportlab.pdfgen import canvas
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "samples"
-BILL_TO = ["Lumen Home Goods, Inc.", "Accounts Payable", "410 Hudson Street", "New York, NY 10014"]
+BILL_TO = ["Lumen Home Goods Pvt. Ltd.", "Accounts Payable, 4th Floor, Prestige Tech Park", "Outer Ring Road, Bengaluru 560103",
+           "GSTIN 29AAECL4821K1Z3"]
+
+
+def inr(x: float) -> str:
+    """Indian digit grouping: 1234567.5 -> '12,34,567.50'."""
+    neg, x = x < 0, abs(round(x, 2))
+    whole, frac = f"{x:.2f}".split(".")
+    head, tail = whole[:-3], whole[-3:]
+    while len(head) > 2:
+        tail = head[-2:] + "," + tail
+        head = head[:-2]
+    out = (head + "," + tail if head else tail) + "." + frac
+    return ("-" if neg else "") + out
 
 
 def money(x: float) -> str:
-    return f"${x:,.2f}"
+    return "Rs. " + inr(x)
 
 
 # --------------------------------------------------------------------------- layouts
@@ -41,7 +54,7 @@ def layout_modern(c: canvas.Canvas, s: dict) -> None:
     c.setFont("Helvetica", 9)
     c.drawString(0.7 * inch, H - 0.85 * inch, s["vendor_address"])
     c.setFont("Helvetica-Bold", 26)
-    c.drawRightString(W - 0.7 * inch, H - 0.7 * inch, "INVOICE")
+    c.drawRightString(W - 0.7 * inch, H - 0.7 * inch, s.get("doc_title", "TAX INVOICE"))
 
     c.setFillColor(colors.black)
     y = H - 1.6 * inch
@@ -77,7 +90,7 @@ def layout_classic(c: canvas.Canvas, s: dict) -> None:
     c.line(0.8 * inch, H - 1.4 * inch, W - 0.8 * inch, H - 1.4 * inch)
 
     c.setFont("Times-Bold", 16)
-    c.drawString(0.8 * inch, H - 1.85 * inch, s.get("doc_title", "INVOICE"))
+    c.drawString(0.8 * inch, H - 1.85 * inch, s.get("doc_title", "TAX INVOICE"))
     y = H - 2.2 * inch
     c.setFont("Times-Roman", 11)
     for label, value in s["meta"]:
@@ -108,7 +121,7 @@ def layout_industrial(c: canvas.Canvas, s: dict) -> None:
     c.drawString(0.65 * inch, H - 1.0 * inch, s["vendor_address"])
     c.drawString(0.65 * inch, H - 1.15 * inch, s.get("vendor_contact", ""))
     c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(W - 0.65 * inch, H - 0.8 * inch, s.get("doc_title", "INVOICE"))
+    c.drawRightString(W - 0.65 * inch, H - 0.8 * inch, s.get("doc_title", "TAX INVOICE"))
 
     # boxed meta grid
     y = H - 1.55 * inch
@@ -142,16 +155,16 @@ def _table(c, s, y, header_fill, font="Helvetica", bold="Helvetica-Bold", size=1
     c.setFont(bold, size - 1)
     c.drawString(left, y, s.get("col_desc", "Description"))
     c.drawRightString(x_qty, y, s.get("col_qty", "Qty"))
-    c.drawRightString(x_unit, y, s.get("col_unit", "Unit Price"))
-    c.drawRightString(x_amt, y, s.get("col_amt", "Amount"))
+    c.drawRightString(x_unit, y, s.get("col_unit", "Rate (Rs.)"))
+    c.drawRightString(x_amt, y, s.get("col_amt", "Amount (Rs.)"))
     y -= 22
     c.setFont(font, size)
     for ln in s["lines"]:
         c.drawString(left, y, ln["description"])
         qty = ln["qty"]
         c.drawRightString(x_qty, y, f"{qty:,.0f}" if float(qty).is_integer() else f"{qty:,.2f}")
-        c.drawRightString(x_unit, y, money(ln["unit_price"]))
-        c.drawRightString(x_amt, y, money(round(ln["qty"] * ln["unit_price"], 2)))
+        c.drawRightString(x_unit, y, inr(ln["unit_price"]))
+        c.drawRightString(x_amt, y, inr(round(ln["qty"] * ln["unit_price"], 2)))
         y -= 18
     c.setLineWidth(0.5)
     c.line(x_qty - 0.6 * inch, y + 6, right, y + 6)
@@ -189,7 +202,7 @@ def _table(c, s, y, header_fill, font="Helvetica", bold="Helvetica-Bold", size=1
 
     c.setFont(font, 7)
     c.setFillColor(colors.grey)
-    c.drawString(left, 0.5 * inch, s.get("footer", "Thank you for your business."))
+    c.drawString(left, 0.5 * inch, s.get("footer", "This is a computer-generated invoice. Subject to Bengaluru jurisdiction."))
     c.setFillColor(colors.black)
 
 
@@ -266,195 +279,205 @@ def photograph(pdf_bytes: bytes, seed: int = 11) -> bytes:
 
 
 # --------------------------------------------------------------------------- specs
-def totals(sub, tax=None, rate=None, ship=None, label_total="Total Due"):
-    rows = [("Subtotal", money(sub), False)]
+def totals(sub, gst=None, rate=18, ship=None, label_total="Total (INR)", note=None):
+    """GST rows the way Indian invoices print them: CGST + SGST within a state, IGST across states."""
+    rows = [("Taxable Value" if gst else "Subtotal", money(sub), False)]
     if ship:
         rows.append(("Shipping", money(ship), False))
-    if tax is not None:
-        rows.append((f"Sales Tax ({rate})" if rate else "Tax", money(tax), False))
-    grand = round(sub + (ship or 0) + (tax or 0), 2)
-    rows.append((label_total, money(grand), True))
+    tax = 0.0
+    if gst == "intra":
+        half = round((sub + (ship or 0)) * rate / 200, 2)
+        rows += [(f"CGST @ {rate / 2:g}%", money(half), False), (f"SGST @ {rate / 2:g}%", money(half), False)]
+        tax = 2 * half
+    elif gst == "inter":
+        tax = round((sub + (ship or 0)) * rate / 100, 2)
+        rows.append((f"IGST @ {rate:g}%", money(tax), False))
+    if note:
+        rows.append((note, "-", False))
+    rows.append((label_total, money(round(sub + (ship or 0) + tax, 2)), True))
     return rows
 
 
+SAHYADRI = "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058  ·  accounts@sahyadrisupplies.in  ·  GSTIN 29AAKCS3127M1Z6"
 SAMPLES = [
     {
-        "file": "01_happy_northwind_NW-58213.pdf",
+        "file": "01_happy_sahyadri_SOS-58213.pdf",
         "id": "happy_path",
         "kind": "Happy path",
         "title": "Clean invoice, exact 3-way match",
-        "what_to_expect": "Approved. PO match is exact, goods received, and the 2/10 early-payment discount is flagged.",
+        "what_to_expect": "Approved. PO match is exact, goods received (GRN on file), GST is CGST + SGST at 18% as expected for a Karnataka vendor, and the 2/10 early-payment discount is flagged.",
         "layout": "modern", "accent": "#0E7C66",
-        "vendor_name": "Northwind Office Supplies Inc.",
-        "vendor_address": "88 Commerce Way, Secaucus, NJ 07094  ·  ar@northwindsupplies.com  ·  EIN 94-3127756",
-        "meta": [("Invoice #", "NW-58213"), ("Invoice Date", "Nov 09, 2026"), ("PO Number", "PO-2026-0311"),
-                 ("Terms", "2/10 Net 30"), ("Due Date", "Dec 09, 2026")],
+        "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
+        "vendor_address": SAHYADRI,
+        "meta": [("Invoice No.", "SOS/26-27/58213"), ("Invoice Date", "09 Nov 2026"), ("PO Number", "PO-2026-0311"),
+                 ("Terms", "2/10 Net 30"), ("Due Date", "09 Dec 2026")],
         "lines": [
-            {"description": "A4 copy paper 80gsm - case of 10 reams", "qty": 40, "unit_price": 38.50},
-            {"description": "HP 58A Black Toner Cartridge", "qty": 12, "unit_price": 96.00},
-            {"description": "Ergonomic Mesh Office Chair", "qty": 6, "unit_price": 289.00},
+            {"description": "A4 copier paper 75gsm - box of 10 reams", "qty": 40, "unit_price": 3080.00},
+            {"description": "HP 58A Black Toner Cartridge", "qty": 12, "unit_price": 7680.00},
+            {"description": "Ergonomic Mesh Office Chair", "qty": 6, "unit_price": 23120.00},
         ],
-        "totals": totals(4426.00, 392.81, "8.875%"),
-        "notes": ["Remit to: JPMorgan Chase Bank, N.A.  Routing 021000021  Account 000123454417",
+        "totals": totals(354080.00, "intra"),
+        "notes": ["Bank: HDFC Bank Ltd.  A/c No. 50200012345417  IFSC HDFC0000523",
                   "2% discount if paid within 10 days of invoice date."],
     },
     {
-        "file": "02_edge_split_billing_atlas_ATL-INV-1209.pdf",
+        "file": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
         "id": "edge_split_po_overrun",
         "kind": "Edge case 1",
         "title": "Split billing pushes PO over its cap",
-        "what_to_expect": "On hold for the buyer. This invoice alone looks fine, but combined with the $30,000 already billed it overruns the 320-hour PO by $3,750 (7.8%). The process suggests a partial approval of $18,000.",
+        "what_to_expect": "On hold for the buyer. This invoice alone looks fine, but combined with the ₹24,00,000 already billed it overruns the 320-hour PO by ₹3,00,000 (7.8%). The process suggests a partial approval of ₹14,40,000.",
         "layout": "classic",
-        "vendor_name": "Atlas Cloud Services LLC",
-        "vendor_address": "500 Howard Street, Suite 900, San Francisco, CA 94105",
-        "vendor_contact": "billing@atlascloud.io  ·  Tax ID 47-2210983",
-        "meta": [("Bill Number", "ATL-INV-1209"), ("Date", "31 October 2026"), ("Your Ref", "PO-2026-0287"),
+        "vendor_name": "Kaveri Cloud Solutions LLP",
+        "vendor_address": "Office 902, Panchshil Tech Park, Yerwada, Pune, Maharashtra 411006",
+        "vendor_contact": "billing@kavericloud.in  ·  GSTIN 27AAPFK2210Q1Z9  ·  SAC 998313",
+        "meta": [("Bill Number", "KCS-INV-1209"), ("Date", "31 October 2026"), ("Your Ref", "PO-2026-0287"),
                  ("Period", "1 Oct - 31 Oct 2026"), ("Terms", "Net 30")],
-        "col_desc": "Service", "col_qty": "Hours", "col_unit": "Rate",
+        "col_desc": "Service", "col_qty": "Hours", "col_unit": "Rate (Rs.)",
         "lines": [
-            {"description": "Data platform implementation - consulting hours (October)", "qty": 145, "unit_price": 150.00},
+            {"description": "Data platform implementation - consulting hours (October)", "qty": 145, "unit_price": 12000.00},
         ],
-        "totals": totals(21750.00, label_total="Amount Due"),
+        "totals": totals(1740000.00, "inter", label_total="Amount Payable"),
         "notes": ["Milestone 2 of engagement. Detailed timesheets available on request.",
-                  "Remit to: Silicon Valley Bank  Routing 121140399  Account 3300918842"],
+                  "Bank: ICICI Bank Ltd.  A/c No. 182905009188  IFSC ICIC0001829"],
     },
     {
-        "file": "03_edge_scanned_no_po_brightline_BLX-30871.pdf",
+        "file": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
         "id": "edge_scanned_inferred_po",
         "kind": "Edge case 2",
         "title": "Scanned image, no PO reference",
-        "what_to_expect": "The PDF has no text layer, so Gemini reads the page image. No PO is quoted. The process scores the vendor's 2 open POs on lines, amounts and remaining balance, infers PO-2026-0342 with high confidence, confirms delivery, and approves with an inferred-PO note.",
+        "what_to_expect": "The PDF has no text layer, so Gemini reads the page image. No PO is quoted. The process scores the vendor's 2 open POs on lines, amounts and remaining balance, infers PO-2026-0342 with high confidence, confirms delivery against the lorry receipts, and approves with an inferred-PO note. GST is under reverse charge (paid by us), so none is charged on the invoice.",
         "layout": "industrial", "scan": True,
-        "vendor_name": "Brightline Logistics Ltd.",
-        "vendor_address": "2150 S Canal St, Chicago, IL 60616",
-        "vendor_contact": "Tel (312) 555-0122  ·  billing@brightlinelogistics.com  ·  FEIN 36-4419270",
+        "vendor_name": "Ganga Freight Carriers Pvt. Ltd.",
+        "vendor_address": "Gala 7, Rahnal Village, Bhiwandi, Thane, Maharashtra 421302",
+        "vendor_contact": "Tel +91 22 2851 0122  ·  billing@gangafreight.co.in  ·  GSTIN 27AAGCG4419R1Z2",
         "doc_title": "FREIGHT INVOICE",
-        "meta": [("Invoice No.", "BLX-30871"), ("Invoice Date", "11/08/2026"), ("Account", "LUMEN-NY"), ("Terms", "Net 45")],
+        "meta": [("Invoice No.", "GFC-30871"), ("Invoice Date", "08/11/2026"), ("Account", "LUMEN-BLR"), ("Terms", "Net 45")],
         "lines": [
-            {"description": "LTL Freight CHI -> CMH (BOL 88213, 88219, 88227)", "qty": 3, "unit_price": 1240.00},
-            {"description": "Fuel Surcharge 8%", "qty": 1, "unit_price": 297.60},
-            {"description": "Liftgate Delivery", "qty": 3, "unit_price": 85.00},
+            {"description": "PTL Freight BHW -> PNQ (LR 88213, 88219, 88227)", "qty": 3, "unit_price": 99200.00},
+            {"description": "Fuel Surcharge 8%", "qty": 1, "unit_price": 23808.00},
+            {"description": "Unloading / Hamali Charges", "qty": 3, "unit_price": 6800.00},
         ],
-        "totals": totals(4272.60, label_total="TOTAL USD"),
-        "notes": ["Delivered 11/07/2026 - signed POD on file.",
-                  "Remit: BMO Bank N.A. ABA 071000288 Acct 2209914460"],
+        "totals": totals(341808.00, note="GST payable by recipient under RCM", label_total="TOTAL INR"),
+        "notes": ["Delivered 07/11/2026 - signed POD on file.",
+                  "Bank: Axis Bank Ltd. A/c No. 912020044601460 IFSC UTIB0000412"],
     },
     {
-        "file": "04_edge_disguised_duplicate_meridian_INV-2026-0417.pdf",
+        "file": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
         "id": "edge_disguised_duplicate",
         "kind": "Edge case 3",
         "title": "Re-sent duplicate with a reformatted number",
-        "what_to_expect": "Rejected as a duplicate. It's a different file (new hash) and the number is written differently ('INV-2026-0417' vs 'INV 2026/0417'), but the normalised number, vendor and amount match an invoice already paid on ACH-77812.",
+        "what_to_expect": "Rejected as a duplicate. It's a different file (new hash) and the number is written differently ('INV-2026-0417' vs 'INV 2026/0417'), but the normalised number, vendor and amount match an invoice already paid on UTR-77812.",
         "layout": "industrial",
-        "vendor_name": "Meridian Industrial Parts Co.",
-        "vendor_address": "1200 Route 46 West, Parsippany, NJ 07054",
-        "vendor_contact": "ar@meridianparts.com  ·  (973) 555-0190  ·  EIN 22-3098817",
+        "vendor_name": "Meenakshi Industrial Spares Co.",
+        "vendor_address": "112, SIDCO Industrial Estate, Ambattur, Chennai, Tamil Nadu 600098",
+        "vendor_contact": "ar@meenakshispares.com  ·  +91 44 2625 0190  ·  GSTIN 33AAHFM3098P1Z4",
         "meta": [("Invoice No.", "INV-2026-0417"), ("Date", "08-OCT-2026"), ("Cust. PO", "PO-2026-0275"), ("Terms", "NET 30")],
         "col_desc": "Part / Description",
         "lines": [
-            {"description": "BRG-6204  Ball Bearing 6204-2RS", "qty": 500, "unit_price": 4.20},
-            {"description": "HOS-HYD-36  Hydraulic Hose Assy 1/2in x 36in", "qty": 40, "unit_price": 62.50},
-            {"description": "BLT-B48  V-Belt B48", "qty": 120, "unit_price": 11.75},
+            {"description": "BRG-6204  Ball Bearing 6204-2RS", "qty": 500, "unit_price": 336.00},
+            {"description": "HOS-HYD-36  Hydraulic Hose Assy 1/2in x 36in", "qty": 40, "unit_price": 5000.00},
+            {"description": "BLT-B48  V-Belt B48", "qty": 120, "unit_price": 940.00},
         ],
-        "totals": totals(6010.00, 533.39, "8.875%", label_total="BALANCE DUE"),
+        "totals": totals(480800.00, "inter", label_total="BALANCE DUE"),
         "stamp": "SECOND NOTICE",
-        "notes": ["Our records show this invoice as unpaid. Please remit promptly.",
-                  "Remit to: TD Bank, N.A.  ABA 031201360  Acct 4410287736"],
+        "notes": ["Our records show this invoice as unpaid. Kindly remit at the earliest.",
+                  "Bank: State Bank of India  A/c No. 38410287736  IFSC SBIN0000800"],
     },
     {
-        "file": "05_edge_bank_change_keystone_KFM-2026-1147.pdf",
+        "file": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
         "id": "edge_bank_change_fraud",
         "kind": "Edge case 4",
         "title": "Perfect match, but the bank account changed",
-        "what_to_expect": "On hold for Treasury and fraud review. Every number matches the PO, but the remit-to bank account and the sender's email domain don't match the vendor master. This is the classic business email compromise pattern. The process never uses contact details printed on the invoice, and tells AP to call back on the number on file.",
+        "what_to_expect": "On hold for Treasury and fraud review. Every number matches the PO and the GSTIN is right, but the remit-to bank account and the sender's email domain don't match the vendor master. This is the classic business email compromise pattern. The process never uses contact details printed on the invoice, and tells AP to call back on the number on file.",
         "layout": "classic",
-        "vendor_name": "Keystone Facilities Management Inc.",
-        "vendor_address": "77-15 Queens Blvd, Elmhurst, NY 11373",
-        "vendor_contact": "accounts@keystone-fm-billing.com  ·  (718) 555-0163",
-        "meta": [("Bill Number", "KFM-2026-1147"), ("Date", "3 November 2026"), ("Your Ref", "PO-2026-0330"),
+        "vendor_name": "Kesari Facility Services Pvt. Ltd.",
+        "vendor_address": "No. 221, 5th Main, HSR Layout Sector 7, Bengaluru, Karnataka 560102",
+        "vendor_contact": "accounts@kesari-facility-billing.com  ·  +91 80 4718 0163  ·  GSTIN 29AAJCK5582N1Z8",
+        "meta": [("Bill Number", "KFS-2026-1147"), ("Date", "3 November 2026"), ("Your Ref", "PO-2026-0330"),
                  ("Terms", "Net 30")],
         "lines": [
-            {"description": "Janitorial services - November 2026", "qty": 1, "unit_price": 7850.00},
-            {"description": "Exterior window cleaning (quarterly)", "qty": 1, "unit_price": 1200.00},
+            {"description": "Housekeeping services - November 2026", "qty": 1, "unit_price": 628000.00},
+            {"description": "Facade glass cleaning (quarterly)", "qty": 1, "unit_price": 96000.00},
         ],
-        "totals": totals(9050.00, label_total="Amount Due"),
+        "totals": totals(724000.00, "intra", label_total="Amount Payable"),
         "notes": ["!!IMPORTANT: We have changed banks. Effective immediately please remit ALL payments to:",
-                  "Metro Community Bank   Routing 026013673   Account 8841902233",
+                  "Jana Small Finance Bank   A/c No. 4127019902233   IFSC JSFB0004127",
                   "Please update your records. Payments to the old account will be returned."],
     },
     {
-        "file": "06_variant_tolerance_pinnacle_PPP-7734.pdf",
+        "file": "06_variant_tolerance_pragati_PPP-7734.pdf",
         "id": "variant_within_tolerance",
         "kind": "Extra input",
         "title": "Close but not exact: unbudgeted freight",
-        "what_to_expect": "Approved with a note. The vendor added a $45 freight line that isn't on the PO. That's +0.78%, inside the 2% / $500 tolerance, so it passes without a human touch and the variance is logged.",
+        "what_to_expect": "Approved with a note. The vendor added a ₹3,600 freight line that isn't on the PO. That's +0.78%, inside the 2% / ₹40,000 tolerance, so it passes without a human touch and the variance is logged.",
         "layout": "modern", "accent": "#7A3EF0",
-        "vendor_name": "Pinnacle Print & Packaging LLC",
-        "vendor_address": "41 Industrial Pkwy, Hicksville, NY 11801  ·  invoices@pinnacleprint.com",
-        "meta": [("Invoice #", "PPP-7734"), ("Invoice Date", "Nov 06, 2026"), ("PO Number", "PO-2026-0356"),
+        "vendor_name": "Pragati Print & Packaging",
+        "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099  ·  invoices@pragatiprint.in  ·  GSTIN 29ABBFP3374E1Z1",
+        "meta": [("Invoice No.", "PPP-7734"), ("Invoice Date", "06.11.2026"), ("PO Number", "PO-2026-0356"),
                  ("Terms", "Net 30")],
         "lines": [
-            {"description": "Custom corrugated box 12x10x8, 2-colour", "qty": 2000, "unit_price": 1.85},
-            {"description": "Branded tissue paper 20x30 (ream)", "qty": 50, "unit_price": 42.00},
-            {"description": "Freight - expedited", "qty": 1, "unit_price": 45.00},
+            {"description": "Custom corrugated box 12x10x8, 2-colour", "qty": 2000, "unit_price": 148.00},
+            {"description": "Branded tissue paper 20x30 (ream)", "qty": 50, "unit_price": 3360.00},
+            {"description": "Freight - express", "qty": 1, "unit_price": 3600.00},
         ],
-        "totals": totals(5845.00, 518.74, "8.875%"),
-        "notes": ["Remit to: Citibank, N.A.  Routing 021000089  Account 6672019934"],
+        "totals": totals(467600.00, "intra"),
+        "notes": ["Bank: Canara Bank  A/c No. 2611201019934  IFSC CNRB0002611"],
     },
     {
-        "file": "07_variant_missing_fields_halcyon.pdf",
+        "file": "07_variant_missing_fields_annapurna.pdf",
         "id": "variant_missing_fields",
         "kind": "Extra input",
         "title": "No invoice number, no date",
-        "what_to_expect": "Returned to the vendor. Without an invoice number the invoice can't be posted or checked for duplicates. The process drafts the email to the vendor explaining exactly what's missing.",
+        "what_to_expect": "Returned to the vendor. Without an invoice number the invoice can't be posted, checked for duplicates, or claimed for GST input credit. The process drafts the email to the vendor explaining exactly what's missing.",
         "layout": "modern", "accent": "#B54708",
-        "vendor_name": "Halcyon Catering Co.",
-        "vendor_address": "19 W 24th St, New York, NY 10010  ·  hello@halcyoncatering.com",
-        "meta": [("Event", "Lumen Q4 All-Hands"), ("Guests", "120"), ("PO Number", "PO-2026-0361")],
+        "vendor_name": "Annapurna Caterers",
+        "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038  ·  hello@annapurnacaterers.in  ·  GSTIN 29AQRPA4471H1Z5",
+        "meta": [("Event", "Lumen Q4 Town Hall"), ("Guests", "120"), ("PO Number", "PO-2026-0361")],
         "lines": [
-            {"description": "Event catering - Q4 all-hands, 120 guests", "qty": 1, "unit_price": 3450.00},
+            {"description": "Event catering - Q4 town hall, 120 guests", "qty": 1, "unit_price": 276000.00},
         ],
-        "totals": totals(3450.00, 306.19, "8.875%"),
-        "notes": ["Thank you for choosing Halcyon!", "Remit to: Bank of America  Routing 026009593  Account 4830021175"],
+        "totals": totals(276000.00, "intra", rate=5),
+        "notes": ["Thank you for choosing Annapurna!", "Bank: Bank of Baroda  A/c No. 48300200021175  IFSC BARB0INDIRA"],
     },
     {
-        "file": "08_variant_phone_photo_northwind_NW-58377.jpg",
+        "file": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
         "id": "variant_phone_photo",
         "kind": "Extra input",
         "title": "Phone photo of a paper invoice",
-        "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. It's a 3-way match on a second Northwind PO, so it's approved.",
+        "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. It's a 3-way match on a second Sahyadri PO, so it's approved.",
         "layout": "modern", "accent": "#0E7C66", "photo": True,
-        "vendor_name": "Northwind Office Supplies Inc.",
-        "vendor_address": "88 Commerce Way, Secaucus, NJ 07094  ·  ar@northwindsupplies.com  ·  EIN 94-3127756",
-        "meta": [("Invoice #", "NW-58377"), ("Invoice Date", "Nov 10, 2026"), ("PO Number", "PO-2026-0368"),
-                 ("Terms", "Net 30"), ("Due Date", "Dec 10, 2026")],
+        "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
+        "vendor_address": SAHYADRI,
+        "meta": [("Invoice No.", "SOS/26-27/58377"), ("Invoice Date", "10 Nov 2026"), ("PO Number", "PO-2026-0368"),
+                 ("Terms", "Net 30"), ("Due Date", "10 Dec 2026")],
         "lines": [
-            {"description": "Whole-bean coffee 1 kg", "qty": 10, "unit_price": 24.00},
-            {"description": "Paper towels - case of 12 rolls", "qty": 8, "unit_price": 31.50},
-            {"description": "Disinfectant wipes 80 ct", "qty": 12, "unit_price": 7.25},
+            {"description": "Filter coffee powder 1 kg", "qty": 10, "unit_price": 1920.00},
+            {"description": "Tissue rolls - case of 12", "qty": 8, "unit_price": 2520.00},
+            {"description": "Disinfectant wipes 80 ct", "qty": 12, "unit_price": 580.00},
         ],
-        "totals": totals(579.00, 51.39, "8.875%"),
-        "notes": ["Remit to: JPMorgan Chase Bank, N.A.  Routing 021000021  Account 000123454417"],
+        "totals": totals(46320.00, "intra"),
+        "notes": ["Bank: HDFC Bank Ltd.  A/c No. 50200012345417  IFSC HDFC0000523"],
     },
     {
-        "file": "09_variant_quote_pinnacle_Q-2291.pdf",
+        "file": "09_variant_quote_pragati_Q-2291.pdf",
         "id": "variant_not_an_invoice",
         "kind": "Extra input",
         "doc_type": "quote",
         "title": "Not an invoice: a supplier quote",
         "what_to_expect": "Filed, not paid. A vendor sent a price quote to the AP inbox. It has prices and a total, but it isn't a bill, so there's nothing to pay and nothing wrong with the sender. It's filed for reference and kept out of the rejection numbers. If it ever turns out to be a real invoice, a reviewer can correct it and re-check.",
         "layout": "industrial", "doc_title": "QUOTATION",
-        "vendor_name": "Pinnacle Print & Packaging LLC",
-        "vendor_address": "41 Industrial Pkwy, Hicksville, NY 11801",
-        "vendor_contact": "sales@pinnacleprint.com  ·  (516) 555-0148",
-        "meta": [("Quote No.", "Q-2291"), ("Quote Date", "Nov 11, 2026"), ("Valid Until", "Dec 11, 2026"), ("Terms", "Net 30")],
+        "vendor_name": "Pragati Print & Packaging",
+        "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
+        "vendor_contact": "sales@pragatiprint.in  ·  +91 80 2837 0148  ·  GSTIN 29ABBFP3374E1Z1",
+        "meta": [("Quote No.", "Q-2291"), ("Quote Date", "11 Nov 2026"), ("Valid Until", "11 Dec 2026"), ("Terms", "Net 30")],
         "lines": [
-            {"description": "Custom mailer box 9x6x3, 1-colour", "qty": 5000, "unit_price": 0.92},
-            {"description": "Die / plate setup (one-time)", "qty": 1, "unit_price": 350.00},
+            {"description": "Custom mailer box 9x6x3, 1-colour", "qty": 5000, "unit_price": 73.60},
+            {"description": "Die / plate setup (one-time)", "qty": 1, "unit_price": 28000.00},
         ],
-        "totals": totals(4950.00, label_total="Quote Total"),
+        "totals": totals(396000.00, note="GST extra as applicable", label_total="Quote Total"),
         "notes": ["This is a quotation, not a request for payment. Prices are valid for 30 days.",
                   "To accept, please issue a purchase order referencing Q-2291."],
+        "footer": "This is a computer-generated quotation. Prices are exclusive of GST.",
     },
 ]
 

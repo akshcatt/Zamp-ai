@@ -53,14 +53,17 @@ EXTRACTION_SCHEMA = {
                 "properties": {"description": {"type": "string"}, "quantity": NUM, "unit_price": NUM, "amount": NUM},
             },
         },
-        "subtotal": NUM, "tax_amount": NUM, "tax_rate_pct": NUM,
+        "subtotal": {"type": ["number", "null"], "description": "Amount before tax (often labelled 'Taxable Value' on Indian GST invoices)"},
+        "tax_amount": {"type": ["number", "null"], "description": "Total GST charged: CGST + SGST (or UTGST), or IGST. Null if no tax is charged"},
+        "tax_rate_pct": NUM,
         "shipping_amount": {"type": ["number", "null"], "description": "Only a shipping/freight charge printed as its own row in the totals block. If freight appears as a line item, leave this null"},
         "total_amount": NUM,
         "tax_inclusive": {"type": "boolean"},
         "bank_details": {
             "type": "object", "additionalProperties": False,
-            "required": ["bank_name", "routing_number", "account_number", "iban", "swift"],
-            "properties": {"bank_name": STR, "routing_number": STR, "account_number": STR, "iban": STR, "swift": STR},
+            "required": ["bank_name", "ifsc", "account_number", "iban", "swift"],
+            "properties": {"bank_name": STR, "ifsc": {"type": ["string", "null"], "description": "Indian IFSC code, 11 characters (e.g. HDFC0000523)"},
+                           "account_number": STR, "iban": STR, "swift": STR},
         },
         "payment_instruction_notes": {"type": ["string", "null"], "description": "Verbatim text about payment instructions, esp. any change of bank details"},
         "field_confidence": {
@@ -77,7 +80,10 @@ SYSTEM = """You are the document-reading step of an accounts-payable pipeline. Y
 
 Rules:
 - Transcribe exactly what is printed. Never infer or invent a value that is not on the page. If a field is absent, return null. Example: no PO number printed means po_reference = null, even if you can guess one.
-- Numbers are plain decimals with no currency symbols or thousands separators. Dates are ISO YYYY-MM-DD. Interpret US-style dates (MM/DD/YYYY) as US unless the document clearly uses another convention.
+- These are Indian invoices. Amounts are in rupees (Rs., ₹ or INR) and use Indian digit grouping (12,34,567.50 = 1234567.50). Return numbers as plain decimals with no currency symbols or separators. currency is "INR" unless another currency is printed.
+- Dates are ISO YYYY-MM-DD. Numeric dates on Indian documents are day first: 08/11/2026 and 08.11.2026 are 8 November 2026.
+- GST: tax_amount is the total tax charged, i.e. CGST + SGST (or UTGST) added together, or IGST. tax_rate_pct is the combined rate (9% CGST + 9% SGST = 18). If the invoice says GST is payable under reverse charge (RCM) or "GST extra", no tax is charged on it: tax_amount = null.
+- vendor_tax_id is the vendor's GSTIN (15 characters, e.g. 29AAKCS3127M1Z6), not the buyer's.
 - line_items: one entry per printed line. amount is the printed line total.
 - shipping_amount is only for a shipping/freight row in the totals block (next to subtotal and tax). If freight is listed as a line item, it belongs in line_items only. Never count it twice.
 - tax_inclusive = true only if prices are stated to include tax.
@@ -229,15 +235,14 @@ def extract_with_gemini(pdf_bytes: bytes, text_layer: str) -> tuple[dict, dict]:
 
 
 # ------------------------------------------------------------------ heuristic fallback
-_AMT = r"\$?\s?([\d,]+\.\d{2})"
-_DATE_FORMATS = ["%b %d, %Y", "%d %B %Y", "%B %d, %Y", "%m/%d/%Y", "%d-%b-%Y", "%Y-%m-%d", "%d %b %Y"]
+_DATE_FORMATS = ["%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y", "%d/%m/%Y", "%d.%m.%Y", "%d-%m-%Y", "%d-%b-%Y", "%Y-%m-%d"]  # day first, as in India
 
 
 def _to_float(s: str | None) -> float | None:
     if not s:
         return None
     try:
-        return float(s.replace(",", "").replace("$", "").strip())
+        return float(re.sub(r"(?i)rs\.?|inr|₹|,", "", s).strip())
     except ValueError:
         return None
 
@@ -288,47 +293,53 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
         m = re.search(r"INVOICE NO\.?.*\n\s*([A-Z0-9][A-Z0-9\-/]+)", text, re.I)
         inv_no = m.group(1) if m else None
     dpat = (r"([A-Z][a-z]{2,8}\.? \d{1,2}, \d{4}|\d{1,2} [A-Z][a-z]{2,8} \d{4}|\d{1,2}/\d{1,2}/\d{4}"
-            r"|\d{1,2}-[A-Za-z]{3}-\d{4}|\d{4}-\d{2}-\d{2})")
+            r"|\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}-[A-Za-z]{3}-\d{4}|\d{1,2}-\d{1,2}-\d{4}|\d{4}-\d{2}-\d{2})")
     date_raw = _find([rf"Invoice\s*Date\s*:?\s*{dpat}", rf"(?m)^Date\s*:?\s*{dpat}", rf"\bDate\s*:?\s*{dpat}",
                       rf"INVOICE DATE.*\n.*?{dpat}", rf"\bDATE\b.*\n.*?{dpat}"], text, re.I)
     po = _find([r"\b(PO-\d{4}-\d{3,5})\b"], text)
     lines_out = []
     for l in lines:
-        m = re.match(r"^(.+?)\s+([\d,]+(?:\.\d+)?)\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})$", l)
-        if m and not re.match(r"(?i)^(subtotal|total|tax|sales)", m.group(1)):
+        m = re.match(r"^(.+?)\s+([\d,]+(?:\.\d+)?)\s+(?:Rs\.?\s?)?([\d,]+\.\d{2})\s+(?:Rs\.?\s?)?([\d,]+\.\d{2})$", l)
+        if m and not re.match(r"(?i)^(subtotal|total|tax|taxable|[cs]gst|igst)", m.group(1)):
             lines_out.append({"description": m.group(1), "quantity": _to_float(m.group(2)),
                               "unit_price": _to_float(m.group(3)), "amount": _to_float(m.group(4))})
     def label_amount(label_re: str) -> float | None:
         """Last money amount on the first line whose label matches (avoids reading '8.875%' as an amount)."""
         for l in lines:
             if re.match(label_re, l, re.I):
-                amts = re.findall(r"\$?\s?(\d[\d,]*\.\d{2})(?!\d|%)", l)
+                amts = re.findall(r"(\d[\d,]*\.\d{2})(?!\d|%)", l)
                 if amts:
                     return _to_float(amts[-1])
         return None
 
-    subtotal = label_amount(r"^sub\s*total\b")
-    tax = label_amount(r"^(?:sales\s*)?tax\b")
-    ship = label_amount(r"^shipping(?:\s*(?:&|and)\s*handling)?\s*\$")
-    total = (label_amount(r"^(?:total\s*due|amount\s*due|balance\s*due|total\s*usd|grand\s*total)\b")
+    subtotal = label_amount(r"^(?:sub\s*total|taxable\s*value)\b")
+    gst_parts = []
+    for l in lines:  # CGST + SGST (intra-state) or IGST (inter-state): sum every GST row
+        if re.match(r"(?i)^(?:cgst|sgst|utgst|igst)\b", l):
+            a = re.findall(r"(\d[\d,]*\.\d{2})(?!\d|%)", l)
+            if a:
+                gst_parts.append(_to_float(a[-1]))
+    tax = round(sum(gst_parts), 2) if gst_parts else label_amount(r"^(?:gst|tax)\b")
+    ship = label_amount(r"^shipping(?:\s*(?:&|and)\s*handling)?\b")
+    total = (label_amount(r"^(?:total\s*due|amount\s*due|amount\s*payable|balance\s*due|total\s*\(?inr\)?|grand\s*total|net\s*payable)\b")
              or label_amount(r"^total\b"))
-    routing = _find([r"(?:Routing|ABA)\s*:?\s*(\d{9})"], text)
-    acct = _find([r"(?:Account|Acct)\s*:?\s*(\d{6,17})"], text)
-    bank = _find([r"(?:Remit(?:\s*to)?:?)\s*([A-Za-z.,& ]+?(?:Bank|N\.A\.)[A-Za-z.,& ]*?)\s+(?:Routing|ABA)"], text)
+    ifsc = _find([r"IFSC(?:\s*Code)?\s*:?\s*([A-Z]{4}0[A-Z0-9]{6})"], text)
+    acct = _find([r"(?:A/c|Account|Acct)\.?\s*(?:No\.?)?\s*:?\s*(\d{6,18})"], text)
+    bank = _find([r"Bank\s*:\s*([A-Za-z.,& ]+?)\s+A/c"], text)
     if not bank:
-        bank = _find([r"^([A-Za-z.,& ]*Bank[A-Za-z.,& ]*?)\s+(?:Routing|ABA)"], text, re.I | re.M)
+        bank = _find([r"^([A-Za-z.,& ]*(?:Bank|State Bank of India)[A-Za-z.,& ]*?)\s+A/c"], text, re.I | re.M)
     email = _find([r"([\w.+-]+@[\w-]+\.[\w.]+)"], text)
     change_note = _find([r"((?:we have changed banks|new bank|updated bank|change of bank)[^\n]*)"], text)
     terms = _find([r"Terms\s*:?\s*((?:\d+/\d+\s+)?Net\s*\d+)"], text)
     data = {
         "document_type": _doc_type(text),
-        "vendor_name": first, "vendor_address": None, "vendor_tax_id": _find([r"(?:EIN|FEIN|Tax ID)\s*:?\s*(\d{2}-\d{7})"], text),
-        "vendor_email": email, "vendor_phone": None, "bill_to_name": "Lumen Home Goods, Inc." if "Lumen Home Goods" in text else None,
+        "vendor_name": first, "vendor_address": None, "vendor_tax_id": _find([r"GSTIN\s*:?\s*(\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]Z[0-9A-Z])"], text),
+        "vendor_email": email, "vendor_phone": None, "bill_to_name": "Lumen Home Goods Pvt. Ltd." if "Lumen Home Goods" in text else None,
         "invoice_number": inv_no, "invoice_date": _to_date(date_raw), "due_date": None, "po_reference": po,
-        "payment_terms": terms, "currency": "USD", "line_items": lines_out,
+        "payment_terms": terms, "currency": "INR", "line_items": lines_out,
         "subtotal": subtotal, "tax_amount": tax, "tax_rate_pct": None, "shipping_amount": ship, "total_amount": total,
         "tax_inclusive": False,
-        "bank_details": {"bank_name": bank, "routing_number": routing, "account_number": acct, "iban": None, "swift": None},
+        "bank_details": {"bank_name": bank, "ifsc": ifsc, "account_number": acct, "iban": None, "swift": None},
         "payment_instruction_notes": change_note,
         "field_confidence": {k: (0.75 if v else 1.0) for k, v in
                              {"vendor_name": first, "invoice_number": inv_no, "invoice_date": date_raw, "po_reference": po,

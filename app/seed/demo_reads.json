@@ -1,52 +1,52 @@
 [
  {
-  "file": "01_happy_northwind_NW-58213.pdf",
-  "sha256": "66318809a434a69f37bbae7509e9bb8cd524fddf6841cdc1c781c0c5ebbb715e",
+  "file": "01_happy_sahyadri_SOS-58213.pdf",
+  "sha256": "259d8ff649c2d99861604bb046ab08a3700136f1a331d55c90b89b3d537ae6de",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "Northwind Office Supplies Inc.",
-   "vendor_address": "88 Commerce Way, Secaucus, NJ 07094",
-   "vendor_tax_id": "94-3127756",
-   "vendor_email": "ar@northwindsupplies.com",
+   "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
+   "vendor_address": "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058",
+   "vendor_tax_id": "29AAKCS3127M1Z6",
+   "vendor_email": "accounts@sahyadrisupplies.in",
    "vendor_phone": null,
-   "bill_to_name": "Lumen Home Goods, Inc.",
-   "invoice_number": "NW-58213",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "SOS/26-27/58213",
    "invoice_date": "2026-11-09",
    "due_date": "2026-12-09",
    "po_reference": "PO-2026-0311",
    "payment_terms": "2/10 Net 30",
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
-     "description": "A4 copy paper 80gsm - case of 10 reams",
+     "description": "A4 copier paper 75gsm - box of 10 reams",
      "quantity": 40,
-     "unit_price": 38.5,
-     "amount": 1540.0
+     "unit_price": 3080.0,
+     "amount": 123200.0
     },
     {
      "description": "HP 58A Black Toner Cartridge",
      "quantity": 12,
-     "unit_price": 96.0,
-     "amount": 1152.0
+     "unit_price": 7680.0,
+     "amount": 92160.0
     },
     {
      "description": "Ergonomic Mesh Office Chair",
      "quantity": 6,
-     "unit_price": 289.0,
-     "amount": 1734.0
+     "unit_price": 23120.0,
+     "amount": 138720.0
     }
    ],
-   "subtotal": 4426.0,
-   "tax_amount": 392.81,
-   "tax_rate_pct": 8.875,
+   "subtotal": 354080.0,
+   "tax_amount": 63734.4,
+   "tax_rate_pct": 18,
    "shipping_amount": null,
-   "total_amount": 4818.81,
+   "total_amount": 417814.4,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "JPMorgan Chase Bank, N.A.",
-    "routing_number": "021000021",
-    "account_number": "000123454417",
+    "bank_name": "HDFC Bank Ltd.",
+    "ifsc": "HDFC0000523",
+    "account_number": "50200012345417",
     "iban": null,
     "swift": null
    },
@@ -64,45 +64,45 @@
   }
  },
  {
-  "file": "02_edge_split_billing_atlas_ATL-INV-1209.pdf",
-  "sha256": "df16537a54fe6f0ad268f1604ba8467ade360fa89e4d4a3bd12ce945e4d93674",
+  "file": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
+  "sha256": "ea77b9f99be4b42c5efe33c46111e8f290a780e2c0c8af13e54e70c59b0d233d",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "Atlas Cloud Services LLC",
-   "vendor_address": "500 Howard Street, Suite 900, San Francisco, CA 94105",
-   "vendor_tax_id": "47-2210983",
-   "vendor_email": "billing@atlascloud.io",
+   "vendor_name": "Kaveri Cloud Solutions LLP",
+   "vendor_address": "Office 902, Panchshil Tech Park, Yerwada, Pune, Maharashtra 411006",
+   "vendor_tax_id": "27AAPFK2210Q1Z9",
+   "vendor_email": "billing@kavericloud.in",
    "vendor_phone": null,
-   "bill_to_name": "Lumen Home Goods, Inc.",
-   "invoice_number": "ATL-INV-1209",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "KCS-INV-1209",
    "invoice_date": "2026-10-31",
    "due_date": null,
    "po_reference": "PO-2026-0287",
    "payment_terms": "Net 30",
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
      "description": "Data platform implementation - consulting hours (October)",
      "quantity": 145,
-     "unit_price": 150.0,
-     "amount": 21750.0
+     "unit_price": 12000.0,
+     "amount": 1740000.0
     }
    ],
-   "subtotal": 21750.0,
-   "tax_amount": null,
-   "tax_rate_pct": null,
+   "subtotal": 1740000.0,
+   "tax_amount": 313200.0,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
-   "total_amount": 21750.0,
+   "total_amount": 2053200.0,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "Silicon Valley Bank",
-    "routing_number": "121140399",
-    "account_number": "3300918842",
+    "bank_name": "ICICI Bank Ltd.",
+    "ifsc": "ICIC0001829",
+    "account_number": "182905009188",
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Remit to: Silicon Valley Bank Routing 121140399 Account 3300918842",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -116,121 +116,57 @@
   }
  },
  {
-  "file": "03_edge_scanned_no_po_brightline_BLX-30871.pdf",
-  "sha256": "2655d7060c42bc8621a70b5fb2089ebce52625067439fbe3d5742bff65db6eb1",
+  "file": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
+  "sha256": "ad729275d326f83939cd3b86b2527ca28de92f5a2f1b4cac8ec6710f6699560e",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "BRIGHTLINE LOGISTICS LTD.",
-   "vendor_address": "2150 S Canal St, Chicago, IL 60616",
-   "vendor_tax_id": "36-4419270",
-   "vendor_email": "billing@brightlinelogistics.com",
-   "vendor_phone": "(312) 555-0122",
-   "bill_to_name": "Lumen Home Goods, Inc.",
-   "invoice_number": "BLX-30871",
+   "vendor_name": "GANGA FREIGHT CARRIERS PVT. LTD.",
+   "vendor_address": "Gala 7, Rahnal Village, Bhiwandi, Thane, Maharashtra 421302",
+   "vendor_tax_id": "27AAGCG4419R1Z2",
+   "vendor_email": "billing@gangafreight.co.in",
+   "vendor_phone": "+91 22 2851 0122",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "GFC-30871",
    "invoice_date": "2026-11-08",
    "due_date": null,
    "po_reference": null,
    "payment_terms": "Net 45",
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
-     "description": "LTL Freight CHI -> CMH (BOL 88213, 88219, 88227)",
+     "description": "PTL Freight BHW -> PNQ (LR 88213, 88219, 88227)",
      "quantity": 3,
-     "unit_price": 1240.0,
-     "amount": 3720.0
+     "unit_price": 99200.0,
+     "amount": 297600.0
     },
     {
      "description": "Fuel Surcharge 8%",
      "quantity": 1,
-     "unit_price": 297.6,
-     "amount": 297.6
+     "unit_price": 23808.0,
+     "amount": 23808.0
     },
     {
-     "description": "Liftgate Delivery",
+     "description": "Unloading / Hamali Charges",
      "quantity": 3,
-     "unit_price": 85.0,
-     "amount": 255.0
+     "unit_price": 6800.0,
+     "amount": 20400.0
     }
    ],
-   "subtotal": 4272.6,
+   "subtotal": 341808.0,
    "tax_amount": null,
    "tax_rate_pct": null,
    "shipping_amount": null,
-   "total_amount": 4272.6,
+   "total_amount": 341808.0,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "BMO Bank N.A.",
-    "routing_number": "071000288",
-    "account_number": "2209914460",
+    "bank_name": "Axis Bank Ltd.",
+    "ifsc": "UTIB0000412",
+    "account_number": "912020044601460",
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Remit: BMO Bank N.A. ABA 071000288 Acct 2209914460",
-   "field_confidence": {
-    "vendor_name": 1.0,
-    "invoice_number": 1.0,
-    "invoice_date": 1.0,
-    "po_reference": 1.0,
-    "total_amount": 1.0,
-    "line_items": 1.0,
-    "bank_details": 1.0
-   },
-   "extraction_warnings": []
-  }
- },
- {
-  "file": "04_edge_disguised_duplicate_meridian_INV-2026-0417.pdf",
-  "sha256": "9975bd69e724773c5f735a1b563b16d475de6c2b84753caa316ff2b7cf5658ff",
-  "extractor": "gemini",
-  "data": {
-   "document_type": "invoice",
-   "vendor_name": "MERIDIAN INDUSTRIAL PARTS CO.",
-   "vendor_address": "1200 Route 46 West, Parsippany, NJ 07054",
-   "vendor_tax_id": "22-3098817",
-   "vendor_email": "ar@meridianparts.com",
-   "vendor_phone": "(973) 555-0190",
-   "bill_to_name": "Lumen Home Goods, Inc.",
-   "invoice_number": "INV-2026-0417",
-   "invoice_date": "2026-10-08",
-   "due_date": null,
-   "po_reference": "PO-2026-0275",
-   "payment_terms": "NET 30",
-   "currency": "USD",
-   "line_items": [
-    {
-     "description": "BRG-6204 Ball Bearing 6204-2RS",
-     "quantity": 500,
-     "unit_price": 4.2,
-     "amount": 2100.0
-    },
-    {
-     "description": "HOS-HYD-36 Hydraulic Hose Assy 1/2in x 36in",
-     "quantity": 40,
-     "unit_price": 62.5,
-     "amount": 2500.0
-    },
-    {
-     "description": "BLT-B48 V-Belt B48",
-     "quantity": 120,
-     "unit_price": 11.75,
-     "amount": 1410.0
-    }
-   ],
-   "subtotal": 6010.0,
-   "tax_amount": 533.39,
-   "tax_rate_pct": 8.875,
-   "shipping_amount": null,
-   "total_amount": 6543.39,
-   "tax_inclusive": false,
-   "bank_details": {
-    "bank_name": "TD Bank, N.A.",
-    "routing_number": "031201360",
-    "account_number": "4410287736",
-    "iban": null,
-    "swift": null
-   },
-   "payment_instruction_notes": "Remit to: TD Bank, N.A. ABA 031201360 Acct 4410287736",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -241,56 +177,122 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "Document contains a stamp indicating 'SECOND NOTICE'."
+    "GST payable by recipient under RCM"
    ]
   }
  },
  {
-  "file": "05_edge_bank_change_keystone_KFM-2026-1147.pdf",
-  "sha256": "55dacd6a88c3975096fbc4e3e63d708d918af9f99a3364c4d29330d128be899a",
+  "file": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
+  "sha256": "97bdf128a7e722b63f35ecc24ef40086c4b77d3dfda4052481cde5fd0f8f855c",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "Keystone Facilities Management Inc.",
-   "vendor_address": "77-15 Queens Blvd, Elmhurst, NY 11373",
-   "vendor_tax_id": null,
-   "vendor_email": "accounts@keystone-fm-billing.com",
-   "vendor_phone": "(718) 555-0163",
-   "bill_to_name": "Lumen Home Goods, Inc.",
-   "invoice_number": "KFM-2026-1147",
-   "invoice_date": "2026-11-03",
+   "vendor_name": "MEENAKSHI INDUSTRIAL SPARES CO.",
+   "vendor_address": "112, SIDCO Industrial Estate, Ambattur, Chennai, Tamil Nadu 600098",
+   "vendor_tax_id": "33AAHFM3098P1Z4",
+   "vendor_email": "ar@meenakshispares.com",
+   "vendor_phone": "+91 44 2625 0190",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "INV-2026-0417",
+   "invoice_date": "2026-10-08",
    "due_date": null,
-   "po_reference": "PO-2026-0330",
-   "payment_terms": "Net 30",
-   "currency": "USD",
+   "po_reference": "PO-2026-0275",
+   "payment_terms": "NET 30",
+   "currency": "INR",
    "line_items": [
     {
-     "description": "Janitorial services - November 2026",
-     "quantity": 1,
-     "unit_price": 7850.0,
-     "amount": 7850.0
+     "description": "BRG-6204 Ball Bearing 6204-2RS",
+     "quantity": 500,
+     "unit_price": 336.0,
+     "amount": 168000.0
     },
     {
-     "description": "Exterior window cleaning (quarterly)",
-     "quantity": 1,
-     "unit_price": 1200.0,
-     "amount": 1200.0
+     "description": "HOS-HYD-36 Hydraulic Hose Assy 1/2in x 36in",
+     "quantity": 40,
+     "unit_price": 5000.0,
+     "amount": 200000.0
+    },
+    {
+     "description": "BLT-B48 V-Belt B48",
+     "quantity": 120,
+     "unit_price": 940.0,
+     "amount": 112800.0
     }
    ],
-   "subtotal": 9050.0,
-   "tax_amount": null,
-   "tax_rate_pct": null,
+   "subtotal": 480800.0,
+   "tax_amount": 86544.0,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
-   "total_amount": 9050.0,
+   "total_amount": 567344.0,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "Metro Community Bank",
-    "routing_number": "026013673",
-    "account_number": "8841902233",
+    "bank_name": "State Bank of India",
+    "ifsc": "SBIN0000800",
+    "account_number": "38410287736",
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "IMPORTANT: We have changed banks. Effective immediately please remit ALL payments to: Metro Community Bank Routing 026013673 Account 8841902233 Please update your records. Payments to the old account will be returned.",
+   "payment_instruction_notes": "Our records show this invoice as unpaid. Kindly remit at the earliest.",
+   "field_confidence": {
+    "vendor_name": 1.0,
+    "invoice_number": 1.0,
+    "invoice_date": 1.0,
+    "po_reference": 1.0,
+    "total_amount": 1.0,
+    "line_items": 1.0,
+    "bank_details": 1.0
+   },
+   "extraction_warnings": [
+    "Document contains a stamp saying 'SECOND NOTICE'."
+   ]
+  }
+ },
+ {
+  "file": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
+  "sha256": "e1083bfd3d1f52770c40acbc2d3f1876108392807d82450e2bbc3286145ac759",
+  "extractor": "gemini",
+  "data": {
+   "document_type": "invoice",
+   "vendor_name": "Kesari Facility Services Pvt. Ltd.",
+   "vendor_address": "No. 221, 5th Main, HSR Layout Sector 7, Bengaluru, Karnataka 560102",
+   "vendor_tax_id": "29AAJCK5582N1Z8",
+   "vendor_email": "accounts@kesari-facility-billing.com",
+   "vendor_phone": "+91 80 4718 0163",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "KFS-2026-1147",
+   "invoice_date": "2026-11-03",
+   "due_date": "2026-12-03",
+   "po_reference": "PO-2026-0330",
+   "payment_terms": "Net 30",
+   "currency": "INR",
+   "line_items": [
+    {
+     "description": "Housekeeping services - November 2026",
+     "quantity": 1,
+     "unit_price": 628000.0,
+     "amount": 628000.0
+    },
+    {
+     "description": "Facade glass cleaning (quarterly)",
+     "quantity": 1,
+     "unit_price": 96000.0,
+     "amount": 96000.0
+    }
+   ],
+   "subtotal": 724000.0,
+   "tax_amount": 130320.0,
+   "tax_rate_pct": 18.0,
+   "shipping_amount": null,
+   "total_amount": 854320.0,
+   "tax_inclusive": false,
+   "bank_details": {
+    "bank_name": "Jana Small Finance Bank",
+    "ifsc": "JSFB0004127",
+    "account_number": "4127019902233",
+    "iban": null,
+    "swift": null
+   },
+   "payment_instruction_notes": "IMPORTANT: We have changed banks. Effective immediately please remit ALL payments to: Jana Small Finance Bank A/c No. 4127019902233 IFSC JSFB0004127 Please update your records. Payments to the old account will be returned.",
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -304,57 +306,57 @@
   }
  },
  {
-  "file": "06_variant_tolerance_pinnacle_PPP-7734.pdf",
-  "sha256": "fa171be8c84f3e4412d33c7b59d80e773dc6ee3a3da57ddb0abc0a05aab720f7",
+  "file": "06_variant_tolerance_pragati_PPP-7734.pdf",
+  "sha256": "23322fc54f1aa4e4de3a1c34e51a024ee9f3d0706f2e3a6887c283dbee4bf671",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "Pinnacle Print & Packaging LLC",
-   "vendor_address": "41 Industrial Pkwy, Hicksville, NY 11801",
-   "vendor_tax_id": null,
-   "vendor_email": "invoices@pinnacleprint.com",
+   "vendor_name": "Pragati Print & Packaging",
+   "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
+   "vendor_tax_id": "29ABBFP3374E1Z1",
+   "vendor_email": "invoices@pragatiprint.in",
    "vendor_phone": null,
-   "bill_to_name": "Lumen Home Goods, Inc.",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
    "invoice_number": "PPP-7734",
    "invoice_date": "2026-11-06",
    "due_date": null,
    "po_reference": "PO-2026-0356",
    "payment_terms": "Net 30",
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
      "description": "Custom corrugated box 12x10x8, 2-colour",
      "quantity": 2000,
-     "unit_price": 1.85,
-     "amount": 3700.0
+     "unit_price": 148.0,
+     "amount": 296000.0
     },
     {
      "description": "Branded tissue paper 20x30 (ream)",
      "quantity": 50,
-     "unit_price": 42.0,
-     "amount": 2100.0
+     "unit_price": 3360.0,
+     "amount": 168000.0
     },
     {
-     "description": "Freight - expedited",
+     "description": "Freight - express",
      "quantity": 1,
-     "unit_price": 45.0,
-     "amount": 45.0
+     "unit_price": 3600.0,
+     "amount": 3600.0
     }
    ],
-   "subtotal": 5845.0,
-   "tax_amount": 518.74,
-   "tax_rate_pct": 8.875,
+   "subtotal": 467600.0,
+   "tax_amount": 84168.0,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
-   "total_amount": 6363.74,
+   "total_amount": 551768.0,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "Citibank, N.A.",
-    "routing_number": "021000089",
-    "account_number": "6672019934",
+    "bank_name": "Canara Bank",
+    "ifsc": "CNRB0002611",
+    "account_number": "2611201019934",
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Remit to: Citibank, N.A. Routing 021000089 Account 6672019934",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -368,45 +370,45 @@
   }
  },
  {
-  "file": "07_variant_missing_fields_halcyon.pdf",
-  "sha256": "938188fe8d24b099a748296af5d21e9841bc05b790d6e3bde8904f1186a2dacc",
+  "file": "07_variant_missing_fields_annapurna.pdf",
+  "sha256": "dc3216220bf2472b6d04c0df2a703d11beaa74e95131c95ea023f0b451d51952",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "Halcyon Catering Co.",
-   "vendor_address": "19 W 24th St, New York, NY 10010",
-   "vendor_tax_id": null,
-   "vendor_email": "hello@halcyoncatering.com",
+   "vendor_name": "Annapurna Caterers",
+   "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038",
+   "vendor_tax_id": "29AQRPA4471H1Z5",
+   "vendor_email": "hello@annapurnacaterers.in",
    "vendor_phone": null,
-   "bill_to_name": "Lumen Home Goods, Inc.",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
    "invoice_number": null,
    "invoice_date": null,
    "due_date": null,
    "po_reference": "PO-2026-0361",
    "payment_terms": null,
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
-     "description": "Event catering - Q4 all-hands, 120 guests",
+     "description": "Event catering - Q4 town hall, 120 guests",
      "quantity": 1,
-     "unit_price": 3450.0,
-     "amount": 3450.0
+     "unit_price": 276000.0,
+     "amount": 276000.0
     }
    ],
-   "subtotal": 3450.0,
-   "tax_amount": 306.19,
-   "tax_rate_pct": 8.875,
+   "subtotal": 276000.0,
+   "tax_amount": 13800.0,
+   "tax_rate_pct": 5.0,
    "shipping_amount": null,
-   "total_amount": 3756.19,
+   "total_amount": 289800.0,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "Bank of America",
-    "routing_number": "026009593",
-    "account_number": "4830021175",
+    "bank_name": "Bank of Baroda",
+    "ifsc": "BARB0INDIRA",
+    "account_number": "48300200021175",
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Remit to: Bank of America Routing 026009593 Account 4830021175",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -418,63 +420,62 @@
    },
    "extraction_warnings": [
     "Invoice number is not present on the document.",
-    "Invoice date is not present on the document.",
-    "Due date is not present on the document."
+    "Invoice date is not present on the document."
    ]
   }
  },
  {
-  "file": "08_variant_phone_photo_northwind_NW-58377.jpg",
-  "sha256": "39ba13b4deedd2d9a8e10702629eee7021ec5076e085dbb930991d64d8356aec",
+  "file": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
+  "sha256": "6167e67e54d5594a97009ed5982101cdb3840902f5b82d63344b00655e8965c3",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "vendor_name": "Northwind Office Supplies Inc.",
-   "vendor_address": "88 Commerce Way, Secaucus, NJ 07094",
-   "vendor_tax_id": "94-3127756",
-   "vendor_email": "ar@northwindsupplies.com",
+   "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
+   "vendor_address": "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058",
+   "vendor_tax_id": "29AAKCS3127M1Z6",
+   "vendor_email": "accounts@sahyadrisupplies.in",
    "vendor_phone": null,
-   "bill_to_name": "Lumen Home Goods, Inc.",
-   "invoice_number": "NW-58377",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "SOS/26-27/58377",
    "invoice_date": "2026-11-10",
    "due_date": "2026-12-10",
    "po_reference": "PO-2026-0368",
    "payment_terms": "Net 30",
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
-     "description": "Whole-bean coffee 1 kg",
+     "description": "Filter coffee powder 1 kg",
      "quantity": 10,
-     "unit_price": 24.0,
-     "amount": 240.0
+     "unit_price": 1920.0,
+     "amount": 19200.0
     },
     {
-     "description": "Paper towels - case of 12 rolls",
+     "description": "Tissue rolls - case of 12",
      "quantity": 8,
-     "unit_price": 31.5,
-     "amount": 252.0
+     "unit_price": 2520.0,
+     "amount": 20160.0
     },
     {
      "description": "Disinfectant wipes 80 ct",
      "quantity": 12,
-     "unit_price": 7.25,
-     "amount": 87.0
+     "unit_price": 580.0,
+     "amount": 6960.0
     }
    ],
-   "subtotal": 579.0,
-   "tax_amount": 51.39,
-   "tax_rate_pct": 8.875,
+   "subtotal": 46320.0,
+   "tax_amount": 8337.6,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
-   "total_amount": 630.39,
+   "total_amount": 54657.6,
    "tax_inclusive": false,
    "bank_details": {
-    "bank_name": "JPMorgan Chase Bank, N.A.",
-    "routing_number": "021000021",
-    "account_number": "000123454417",
+    "bank_name": "HDFC Bank Ltd.",
+    "ifsc": "HDFC0000523",
+    "account_number": "50200012345417",
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Remit to: JPMorgan Chase Bank, N.A. Routing 021000021 Account 000123454417",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -488,51 +489,51 @@
   }
  },
  {
-  "file": "09_variant_quote_pinnacle_Q-2291.pdf",
-  "sha256": "df4aaaab1fc26e4ae3604162472486e7364497d4ba04a42ae4834fee668c7e36",
+  "file": "09_variant_quote_pragati_Q-2291.pdf",
+  "sha256": "ac1e1dedd007c2c76fa2715f53a8b00d4704de1473f9e2902fb621832066d899",
   "extractor": "gemini",
   "data": {
    "document_type": "quote",
-   "vendor_name": "PINNACLE PRINT & PACKAGING LLC",
-   "vendor_address": "41 Industrial Pkwy, Hicksville, NY 11801",
-   "vendor_tax_id": null,
-   "vendor_email": "sales@pinnacleprint.com",
-   "vendor_phone": "(516) 555-0148",
-   "bill_to_name": "Lumen Home Goods, Inc.",
+   "vendor_name": "PRAGATI PRINT & PACKAGING",
+   "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
+   "vendor_tax_id": "29ABBFP3374E1Z1",
+   "vendor_email": "sales@pragatiprint.in",
+   "vendor_phone": "+91 80 2837 0148",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
    "invoice_number": "Q-2291",
    "invoice_date": "2026-11-11",
    "due_date": null,
    "po_reference": null,
    "payment_terms": "Net 30",
-   "currency": "USD",
+   "currency": "INR",
    "line_items": [
     {
      "description": "Custom mailer box 9x6x3, 1-colour",
      "quantity": 5000,
-     "unit_price": 0.92,
-     "amount": 4600.0
+     "unit_price": 73.6,
+     "amount": 368000.0
     },
     {
      "description": "Die / plate setup (one-time)",
      "quantity": 1,
-     "unit_price": 350.0,
-     "amount": 350.0
+     "unit_price": 28000.0,
+     "amount": 28000.0
     }
    ],
-   "subtotal": 4950.0,
+   "subtotal": 396000.0,
    "tax_amount": null,
    "tax_rate_pct": null,
    "shipping_amount": null,
-   "total_amount": 4950.0,
+   "total_amount": 396000.0,
    "tax_inclusive": false,
    "bank_details": {
     "bank_name": null,
-    "routing_number": null,
+    "ifsc": null,
     "account_number": null,
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "This is a quotation, not a request for payment. Prices are valid for 30 days. To accept, please issue a purchase order referencing Q-2291.",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,

@@ -120,6 +120,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 return JSONResponse({"detail": "Security check failed. Refresh the page and try again."}, status_code=403)
             request.state.user = sess["u"]
             request.state.csrf = sess["csrf"]
+        if request.method == "POST" and path == "/api/chat" and not limiter.allow(f"chat:{client_ip(request)}", 20, 60):
+            return JSONResponse({"detail": "Lots of questions at once. Give it a minute."}, status_code=429)
         response = await call_next(request)
         for k, v in SECURITY_HEADERS.items():
             response.headers.setdefault(k, v)

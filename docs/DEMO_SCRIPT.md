@@ -8,7 +8,7 @@
 4. The top-right badge must read **AI on · gemini-3.1-flash-lite** (green dot). If it says "AI off · basic reader", the key isn't loaded.
    On the deployed site, **How it works → Run connection test** confirms the key works on the server.
    Click **Set your name** in the top bar so your reviews are recorded under your name.
-5. Rules page: confirm the defaults (2%, $500, $25,000, 0.85, 0.70, 45, 180, Yes).
+5. Rules page: confirm the defaults (2%, ₹40,000, ₹25,00,000, 0.85, 0.70, 45, 180, Yes).
 6. Browser at 110–125% zoom, notifications off, one tab, other windows closed.
 
 ## B. The 5-minute video (Loom)
@@ -16,7 +16,7 @@
 Target 4:45. Speak to a non-technical AP manager, not to an engineer.
 
 **0:00–0:25 · Frame it** (Overview, empty)
-> "Mid-size companies get hundreds of invoices a month. Someone opens each PDF, finds the PO, checks the numbers and decides. The costly errors aren't typos. They're the invoice that's fine on its own but wrong in context, and the invoice that's perfect but pays a fraudster. I built ClearAP around one principle: **the AI reads, the rules decide.** Gemini reads messy invoices; every decision that moves money comes from rules you can audit."
+> "Mid-size companies get hundreds of invoices a month. Someone opens each PDF, finds the PO, checks the numbers and decides. The costly errors aren't typos. They're the invoice that's fine on its own but wrong in context, and the invoice that's perfect but pays a fraudster. I built NoCap around one principle: **the AI reads, the rules decide.** Gemini reads messy invoices; every decision that moves money comes from rules you can audit."
 
 **0:25–1:25 · Happy path, live** (Upload → *Clean invoice* → Run)
 - While the stages tick:
@@ -26,7 +26,7 @@ Target 4:45. Speak to a non-technical AP manager, not to an engineer.
 - Validation:
   > "Arithmetic, tax, dates, and grounding: every key value Gemini extracted must literally appear in the PDF text, which catches misreads."
 - The decision appears:
-  > "Approved, posted, scheduled. And it noticed the 2/10 terms, so it schedules payment on day 10 to capture an $88 discount, which humans routinely miss."
+  > "Approved, posted, scheduled. And it noticed the 2/10 terms, so it schedules payment on day 10 to capture a ₹7,000 discount, which humans routinely miss."
 
 **1:25–2:20 · Edge case: bank change** (Run *Perfect match, but the bank account changed*)
 > "This one is the scariest invoice an AP team gets, because every number is correct: right vendor, right PO, right amount."
@@ -45,15 +45,15 @@ Target 4:45. Speak to a non-technical AP manager, not to an engineer.
 **3:10–3:50 · Edge case: split billing** (Run *Split billing pushes PO over its cap*)
 > "This invoice is fine on its own: 145 hours at the PO rate. But the process checks the ledger."
 - Show the PO balance bar:
-  > "$30k already billed, plus this, overruns the 320-hour PO by $3,750. It's held for the named buyer, with the exact partial amount we could safely pay today."
+  > "₹24 lakh already billed, plus this, overruns the 320-hour PO by ₹3,00,000. It's held for the named buyer, with the exact partial amount we could safely pay today."
 
 **3:50–4:15 · Duplicate, live** (re-run the *Clean invoice*)
 > "Remember the first invoice? It's now in the ledger. If the vendor sends it again…"
 - Decision: rejected as a duplicate.
   > "…it's caught. The same normalisation catches reformatted numbers like 'INV 2026/0417' versus 'INV-2026-0417'."
 
-**4:15–4:45 · Overview & close** (Overview → Needs review → open the Keystone invoice → pick a quick note or type one → Reject)
-> "The overview shows how much ran with no one touching it, what's waiting and with which team and how close it is to its deadline, the money protected, and the time saved. The charts show what came in over time, why invoices were stopped, which team is reviewing what, and where the time goes; any chart flips to a table. You can search, filter and export to a spreadsheet. Humans only see exceptions, routed to the team that owns them, and every action needs a note that goes into the audit trail. Rules and tolerances are editable here, in plain language. That's ClearAP."
+**4:15–4:45 · Overview & close** (Overview → Needs review → open the Kesari invoice → pick a quick note or type one → Reject)
+> "The overview shows how much ran with no one touching it, what's waiting and with which team and how close it is to its deadline, the money protected, and the time saved. The charts show what came in over time, why invoices were stopped, which team is reviewing what, and where the time goes; any chart flips to a table. You can search, filter and export to a spreadsheet. Humans only see exceptions, routed to the team that owns them, and every action needs a note that goes into the audit trail. Rules and tolerances are editable here, in plain language. That's NoCap."
 
 ## C. Live interview runbook (longer version, ~10 min)
 
@@ -61,7 +61,7 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
 
 - **Policy flip:**
   - On Rules, set the price tolerance to `0.5` and save.
-  - Run *Pinnacle*: it's now **held**, because the $45 freight is 0.78%, over the new limit.
+  - Run *Pragati*: it's now **held**, because the ₹3,600 freight is 0.78%, over the new limit.
   - Set it back to `2`.
   - Point: "The business owns the thresholds, not the code."
 - **If they send a phone photo:** drop it in too. JPG, PNG and iPhone HEIC are converted to a PDF at intake (sample 08 shows this).
@@ -74,7 +74,7 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
 - **Bulk review:** in Needs review, tick several invoices, add one note, and Approve or Reject. Each is still checked on its own, and one that can't be actioned is reported, not silently skipped.
 - **Not an invoice:** run sample 09, a supplier quote. It's filed, not paid, and doesn't count as a rejection, so your exception rate stays honest. Point: "Not everything in an AP inbox is a bill."
 - **Archive:** Overview → **Archive finished** clears the board. Then re-run the clean invoice: it's still caught as a duplicate, because archiving never deletes history.
-- **Vendors:** open Vendors to show the Keystone card flagged *Bank-change attempt seen* and Meridian flagged *Sent a repeat invoice*: risk by vendor, not just by invoice.
+- **Vendors:** open Vendors to show the Kesari card flagged *Bank-change attempt seen* and Meenakshi flagged *Sent a repeat invoice*: risk by vendor, not just by invoice.
 - **Exports:** Overview → Export → Excel gives sheets for Summary, Invoices, every Exception, and the Ledger. That's what an AP lead hands to finance.
 - **Accuracy question:** How it works → *How accurate is it?* shows 89/89 fields and 9/9 decisions on the samples. Be upfront that this is a smoke test on clean generated documents; the next step is real redacted invoices.
 - **Free-tier limits:** if a run shows "rate limit reached", wait about 60 seconds. Don't click *Run all* during the live demo; run invoices one at a time.
@@ -95,7 +95,7 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
 - **Why route to different teams?**
   > Because the fix differs. A bank change needs Treasury and a callback; a PO overrun needs the buyer's change order; an unknown vendor needs onboarding. Sending everything to "AP" just moves the pile.
 - **What did you assume?**
-  > See DESIGN.md §5. USD; POs net of tax; 2%/$500 tolerance; 3-way match for goods; missing invoice number means return to vendor.
+  > See DESIGN.md §5. INR; POs net of tax; 2%/₹40,000 tolerance; 3-way match for goods; missing invoice number means return to vendor.
 - **What would you build next?**
   > Email intake, ERP connectors, credit-note matching, multi-currency/VAT, an eval set, and segregation of duties (DESIGN.md §7).
 - **How did you use AI to build this?**

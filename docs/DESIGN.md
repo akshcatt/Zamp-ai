@@ -1,4 +1,4 @@
-# ClearAP: design notes
+# NoCap: design notes
 
 ## 1. The problem, from the AP clerk's chair
 
@@ -39,7 +39,7 @@ Routing priority when several teams have holds: **Treasury & Fraud → Controlle
 ## 3. Why the AI reads and the rules decide
 
 - **Reading** is the step that breaks every rule-based system. Vendor layouts vary, labels vary ("Invoice #", "Bill Number", "Invoice No."), and some invoices are scans. A frontier model reading the PDF directly, text and page image together, handles this without per-vendor templates. That's why Gemini is here.
-- **Deciding** must be explainable, consistent and testable. "The model thought it was fine" is not an audit trail. Every decision in ClearAP is a pure function of named checks, so the same input always gives the same decision, the tests pin it down, and an auditor can read it.
+- **Deciding** must be explainable, consistent and testable. "The model thought it was fine" is not an audit trail. Every decision in NoCap is a pure function of named checks, so the same input always gives the same decision, the tests pin it down, and an auditor can read it.
 - **Guards on the reader:**
   - a strict JSON schema, so fields can't be invented;
   - an instruction to return null rather than guess;
@@ -54,30 +54,30 @@ Routing priority when several teams have holds: **Treasury & Fraud → Controlle
 
 I picked edge cases that test **judgment and context**, not parsing tricks:
 
-1. **Split billing that overruns the PO (Atlas).** Each invoice is fine alone; the problem only exists across invoices. Tests whether the process keeps state (the ledger) and checks *cumulative* billing against the PO cap. The output is actionable: a change order, or a partial approval of exactly the remaining $18,000.
-2. **Scanned invoice with no PO number (Brightline).** Two hard things at once:
+1. **Split billing that overruns the PO (Kaveri).** Each invoice is fine alone; the problem only exists across invoices. Tests whether the process keeps state (the ledger) and checks *cumulative* billing against the PO cap. The output is actionable: a change order, or a partial approval of exactly the remaining ₹14,40,000.
+2. **Scanned invoice with no PO number (Ganga Freight).** Two hard things at once:
    - No text layer, so Gemini reads the image and the text-grounding check is honestly switched off.
    - No PO reference, so the process scores each of the vendor's open POs: `0.55 × line similarity + 0.25 × amount fit vs remaining balance + 0.20 × goods-receipt support`. It accepts the best only if it clears the confidence floor and beats the runner-up by a clear margin.
 
    Line matching deliberately weights structured signals (exact unit price, quantity within PO) over wording, because "LTL Freight CHI → CMH" and "LTL freight, Chicago IL to Columbus OH" share almost no words.
-3. **Disguised duplicate (Meridian).** The most common way AP pays twice: the vendor re-sends a "second notice" with the number written differently. The file hash differs, so naive dedup fails. Normalising invoice numbers (`INV 2026/0417` = `INV-2026-0417` = `INV20260417`) plus vendor plus amount catches it, and the explanation cites the original payment reference. The process also checks the review queue, so the same invoice can't be in review twice.
-4. **Bank-detail change (Keystone).** Business email compromise is the single most costly AP fraud. It's interesting because **every financial check passes**. Three independent signals fire:
+3. **Disguised duplicate (Meenakshi).** The most common way AP pays twice: the vendor re-sends a "second notice" with the number written differently. The file hash differs, so naive dedup fails. Normalising invoice numbers (`INV 2026/0417` = `INV-2026-0417` = `INV20260417`) plus vendor plus amount catches it, and the explanation cites the original payment reference. The process also checks the review queue, so the same invoice can't be in review twice.
+4. **Bank-detail change (Kesari).** Business email compromise is the single most costly AP fraud. It's interesting because **every financial check passes**. Three independent signals fire:
    - the remit-to account differs from the vendor master;
    - the invoice text announces a "new bank";
    - the sender uses a look-alike domain (`keystone-fm-billing.com` vs `keystonefm.com`).
 
    The output is a hold for Treasury, an internal task to **call back on the phone number in the vendor master**, and an explicit "do not reply to the invoice's email". Payments only ever go to the master-file account. That's a control, not a check.
 
-Three extra inputs show the "close but not exact", "communicate back" and "it isn't even a PDF" behaviours. Pinnacle has $45 of freight within tolerance, so it's approved with a note. Halcyon has no invoice number or date, so it's returned to the vendor with a drafted email. The Northwind phone photo (a JPEG of a printed invoice, tilted on a desk) is normalised to a PDF at intake, so every later stage sees one input type, and it's read like a scan.
+Three extra inputs show the "close but not exact", "communicate back" and "it isn't even a PDF" behaviours. Pragati has ₹3,600 of freight within tolerance, so it's approved with a note. Annapurna has no invoice number or date, so it's returned to the vendor with a drafted email. The Sahyadri phone photo (a JPEG of a printed invoice, tilted on a desk) is normalised to a PDF at intake, so every later stage sees one input type, and it's read like a scan.
 
 ## 5. Assumptions (stated, so they can be challenged)
 
-- **Buyer:** Lumen Home Goods, Inc., a fictional NY retailer. USD only. US sales tax.
+- **Buyer:** Lumen Home Goods Pvt. Ltd., a fictional Bengaluru retailer (GSTIN 29AAECL4821K1Z3). INR only. GST: CGST + SGST from Karnataka vendors, IGST from other states, reverse charge (RCM) on freight. Remit-to banks are checked by IFSC + account number.
 - **POs are net of tax.** Matching compares the invoice net (subtotal + shipping, or total − tax when prices include tax) against PO line values.
-- **Tolerance:** 2% **and** $500, whichever is tighter. This applies per invoice (price/qty variance) and to cumulative billing against the PO.
+- **Tolerance:** 2% **and** ₹40,000, whichever is tighter. This applies per invoice (price/qty variance) and to cumulative billing against the PO.
 - **Goods POs need a receipt (3-way); service POs don't (2-way).**
 - **Inferred POs** can be auto-accepted at ≥ 0.85 confidence with a ≥ 0.15 margin. Many companies run "no PO, no pay"; that's one toggle on the Rules page.
-- **Controller sign-off** above $25,000, even when everything matches.
+- **Controller sign-off** above ₹25 lakh, even when everything matches.
 - **Missing invoice number or date → return to vendor**, not "AP fixes it". Without them you can't post or dedupe, and the payment clock should start from a valid invoice.
 - **Demo date is pinned** (`AP_TODAY=2026-11-12`) so the sample dates and discount windows stay meaningful. Remove it in real use.
 - **Line-level quantity history isn't tracked.** Receipts are compared against this invoice's quantities. Cumulative control works on amounts.

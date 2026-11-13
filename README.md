@@ -1,8 +1,8 @@
-# ClearAP: invoice PDF → reasoned decision
+# NoCap: invoice PDF → reasoned decision
 
 **AI Solutions Analyst case study · PS-1 (Finance / AP)**
 
-ClearAP takes a vendor invoice (a digital PDF, a scanned PDF, or a phone photo in JPG/PNG/HEIC) and returns one of three decisions:
+NoCap takes a vendor invoice (a digital PDF, a scanned PDF, or a phone photo in JPG/PNG/HEIC) and returns one of three decisions:
 
 - **Approve:** posted to the ledger and scheduled for payment.
 - **Hold:** routed to the team that owns the problem, with an SLA.
@@ -34,6 +34,9 @@ No API key? It still runs. It falls back to a heuristic text parser, and scanned
 
 ## Features
 
+- **Built for Indian AP:** amounts in ₹ with lakh/crore grouping, GST invoices (CGST + SGST within Karnataka, IGST across states, reverse charge on freight), GSTIN on every vendor, remit-to banks checked by IFSC + account number, day-first dates (08/11/2026 is 8 November). The GST check accepts only real GST slabs.
+- **Ask NoCap:** a read-only chat assistant (Gemini) that answers from the live data: what's waiting, why an invoice was held, how much was protected. It links straight to the invoice, and can't approve or pay anything. Without an API key it falls back to simple built-in answers.
+- **Sections & progress:** a sidebar groups the app into Workspace (Overview, Inbox, Review queue), Insights (Vendors, Ledger & records) and Engine (Rules & accuracy). The sidebar shows how much of the queue you've cleared today and your review streak, and the Overview has milestones earned from real results (first duplicate blocked, ₹1 lakh protected, queue zero…).
 - **Live processing:** each invoice streams through 8 steps with the evidence behind every check, and the original document can be shown side by side with what the AI read.
 - **Batch intake:** drop up to 25 files at once and track them together; a bad file never blocks the others.
 - **Exceptions only:** held invoices go to the team that owns the problem, with a deadline (due soon or overdue). **Bulk approve/reject** takes one note, and each invoice is still checked and audited on its own.
@@ -106,13 +109,13 @@ PDF/photo ─▶ 1 Intake ─▶ 2 Analysis ─▶ 3 AI extraction ─▶ 4 Vali
 
 | # | Invoice | What makes it hard | Decision |
 |---|---|---|---|
-| Happy | Northwind, exact 3-way match | — | **Approve**, and flags the 2/10 early-payment discount ($88.52) |
-| Edge 1 | Atlas Cloud, split billing | The invoice is fine on its own. Combined with the $30k already billed, it overruns the PO by $3,750 (7.8%) | **Hold → Buyer**, with a suggested partial approval of $18,000 |
-| Edge 2 | Brightline, **scanned** with **no PO number** | No text layer; the PO has to be inferred from lines, amounts and receipts | **Approve**, PO inferred at 0.90 confidence (the threshold is configurable) |
-| Edge 3 | Meridian, **disguised duplicate** | New file, number reformatted (`INV-2026-0417` vs `INV 2026/0417`), stamped "SECOND NOTICE" | **Reject**: duplicate of an invoice already paid on ACH-77812 |
-| Edge 4 | Keystone, **bank details changed** | Every number is perfect. The remit-to account and sender domain aren't | **Hold → Treasury & Fraud**, call back on the number on file |
-| Extra | Pinnacle, unbudgeted freight | +$45 (0.78%), inside the 2% / $500 tolerance | **Approve** with the variance noted |
-| Extra | Halcyon, no invoice # or date | Can't post or dedupe | **Reject**: returned to vendor with a drafted email |
-| Extra | Northwind, **phone photo** (JPEG) | Not a PDF at all: tilted, on a desk, uneven light | **Approve**: converted to PDF at intake, read like a scan |
+| Happy | Sahyadri, exact 3-way match | — | **Approve**, and flags the 2/10 early-payment discount (₹7,081.60) |
+| Edge 1 | Kaveri Cloud, split billing | The invoice is fine on its own. Combined with the ₹24 lakh already billed, it overruns the PO by ₹3,00,000 (7.8%) | **Hold → Buyer**, with a suggested partial approval of ₹14,40,000 |
+| Edge 2 | Ganga Freight, **scanned** with **no PO number** | No text layer; the PO has to be inferred from lines, amounts and receipts | **Approve**, PO inferred at 0.90 confidence (the threshold is configurable) |
+| Edge 3 | Meenakshi, **disguised duplicate** | New file, number reformatted (`INV-2026-0417` vs `INV 2026/0417`), stamped "SECOND NOTICE" | **Reject**: duplicate of an invoice already paid on UTR-77812 |
+| Edge 4 | Kesari, **bank details changed** | Every number is perfect. The remit-to account and sender domain aren't | **Hold → Treasury & Fraud**, call back on the number on file |
+| Extra | Pragati, unbudgeted freight | +₹3,600 (0.78%), inside the 2% / ₹40,000 tolerance | **Approve** with the variance noted |
+| Extra | Annapurna, no invoice # or date | Can't post or dedupe | **Reject**: returned to vendor with a drafted email |
+| Extra | Sahyadri, **phone photo** (JPEG) | Not a PDF at all: tilted, on a desk, uneven light | **Approve**: converted to PDF at intake, read like a scan |
 
 Approving posts to the ledger, so **running the same invoice twice is caught as a duplicate**. That's a good live moment.

@@ -1,11 +1,13 @@
-/* ClearAP: vanilla JS single-page app. No build step. */
+/* NoCap: vanilla JS single-page app. No build step. */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const app = $("#app");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const money = (x) => (x == null ? "—" : "$" + Number(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-const cmoney = (x) => (x == null ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1000 ? "$" + (x / 1000).toFixed(1) + "k" : "$" + Math.round(x));
-const kmoney = (x) => (x == null ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e4 ? "$" + (x / 1000).toFixed(1) + "k" : money(x));
+const money = (x) => (x == null ? "—" : "₹" + Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+// Compact rupees the way Indian finance teams say them: K (thousand), L (lakh), Cr (crore).
+const short = (x) => (x >= 1e7 ? (x / 1e7).toFixed(2).replace(/\.?0+$/, "") + " Cr" : x >= 1e5 ? (x / 1e5).toFixed(1).replace(/\.0$/, "") + " L" : x >= 1e3 ? (x / 1e3).toFixed(1).replace(/\.0$/, "") + "K" : String(Math.round(x)));
+const cmoney = (x) => (x == null ? "—" : "₹" + short(x));
+const kmoney = (x) => (x == null ? "—" : x >= 1e5 ? "₹" + short(x) : money(x));
 const toDate = (iso) => new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
 const when = (iso) => (iso ? toDate(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 const ago = (iso) => {
@@ -54,7 +56,46 @@ function waking(on) {
   el.hidden = false;
 }
 const postJSON = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), 2600); };
+const TOAST_ICON = {
+  ok: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>`,
+  error: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg>`,
+  info: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg>`,
+  win: `<svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></svg>`,
+};
+const TOAST_TITLE = { ok: "Done", error: "Couldn't do that", info: "Working on it", win: "Nice work" };
+// Stacked toasts: kind = ok | error | info | win. Errors stay longer; every toast can be dismissed.
+function toast(msg, kind = "ok") {
+  const box = $("#toasts");
+  const t = document.createElement("div");
+  const ms = kind === "error" ? 6000 : kind === "win" ? 5000 : 3400;
+  t.className = `toast ${kind}`;
+  t.setAttribute("role", kind === "error" ? "alert" : "status");
+  t.style.setProperty("--life", ms + "ms");
+  t.innerHTML = `<span class="ti">${TOAST_ICON[kind] || TOAST_ICON.ok}</span><div class="tb"><b>${TOAST_TITLE[kind] || ""}</b><span>${esc(msg)}</span></div>
+    <button class="tx" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button><i class="tl"></i>`;
+  const close = () => { t.classList.add("out"); setTimeout(() => t.remove(), 200); };
+  t.querySelector(".tx").onclick = close;
+  box.appendChild(t);
+  while (box.children.length > 4) box.firstElementChild.remove();
+  setTimeout(close, ms);
+}
+// Styled replacement for confirm()/prompt(). Resolves true/false, or the typed text (null if cancelled).
+function ask({ title, body = "", ok = "Confirm", cancel = "Cancel", danger = false, input = null, icon: ic = "" }) {
+  return new Promise((resolve) => {
+    const m = $("#modal");
+    m.innerHTML = `<div class="modal-box ${danger ? "danger" : ""}" role="dialog" aria-modal="true" aria-labelledby="m-t">
+      ${ic ? `<div class="m-icon">${ic}</div>` : ""}<h2 id="m-t">${esc(title)}</h2>${body ? `<div class="m-body">${body}</div>` : ""}
+      ${input ? `<input class="m-input" id="m-in" value="${esc(input.value || "")}" placeholder="${esc(input.placeholder || "")}" maxlength="60" autocomplete="off">` : ""}
+      <div class="modal-actions"><button class="btn ghost" data-a="0">${esc(cancel)}</button><button class="btn ${danger ? "danger" : "primary"}" data-a="1">${esc(ok)}</button></div></div>`;
+    m.hidden = false;
+    const no = input ? null : false;
+    const done = (v) => { m.hidden = true; m.innerHTML = ""; document.removeEventListener("keydown", key, true); resolve(v); };
+    const key = (e) => { if (e.key === "Escape") { e.stopPropagation(); done(no); } else if (e.key === "Enter" && input) { e.preventDefault(); done($("#m-in").value); } };
+    m.onclick = (e) => { if (e.target === m) return done(no); const b = e.target.closest("[data-a]"); if (b) done(b.dataset.a === "1" ? (input ? $("#m-in").value : true) : no); };
+    document.addEventListener("keydown", key, true);
+    setTimeout(() => (input ? $("#m-in") : $('[data-a="1"]', m)).focus(), 20);
+  });
+}
 const tip = (text) => `<span class="tip" tabindex="0" data-tip="${esc(text)}">?</span>`;
 const icon = {
   upload: `<svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>`,
@@ -67,6 +108,9 @@ const icon = {
   moon: `<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>`,
   edit: `<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>`,
   user: `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>`,
+  archive: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>`,
+  alert: `<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>`,
+  spark: `<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>`,
   flag: `<svg viewBox="0 0 24 24"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg>`,
 };
 
@@ -145,6 +189,13 @@ const routes = [
   [/^#\/vendors$/, viewVendors, "vendors"],
   [/^#\/rules$/, viewRules, "rules"],
 ];
+const PAGES = { dashboard: ["Workspace", "Overview"], inbox: ["Workspace", "Inbox"], queue: ["Workspace", "Review queue"],
+  vendors: ["Insights", "Vendors"], data: ["Insights", "Ledger & records"], rules: ["Engine", "Rules & accuracy"] };
+function drawer(open) {
+  $("#sidebar").classList.toggle("open", open); $("#scrim").hidden = !open; $("#menu").setAttribute("aria-expanded", String(open));
+}
+$("#menu").onclick = () => drawer(!$("#sidebar").classList.contains("open"));
+$("#scrim").onclick = () => drawer(false);
 async function router() {
   stopLive();
   const h = location.hash || "#/";
@@ -152,6 +203,10 @@ async function router() {
     const m = h.match(re);
     if (m) {
       $$("nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === key));
+      const [grp, name] = PAGES[key] || ["Workspace", "Invoice"];
+      $("#crumb").innerHTML = `<span class="faint">${grp}</span><span class="sep">/</span><b>${name}</b>`;
+      document.title = `${name} · NoCap`;
+      drawer(false);
       try { await fn(...m.slice(1)); } catch (e) { app.innerHTML = `<div class="card pad">Something went wrong: ${esc(e.message)}</div>`; }
       window.scrollTo(0, 0);
       return;
@@ -170,20 +225,71 @@ async function refreshChrome() {
     m.title = h.llm ? `Invoices are read by Google Gemini (${h.model}). Rules still make every decision.` : "No GEMINI_API_KEY set. A simple text parser reads digital PDFs; scans and photos go to a person.";
     const q = $("#queue-count");
     q.hidden = !s.pending_review; q.textContent = s.pending_review;
+    paintMomentum(s);
   } catch {}
   paintWho();
 }
+
+/* ------------------------------------------------------------------ progress & milestones (light gamification) */
+// Facts only: every milestone is computed from real stats, never invented.
+function milestones(s) {
+  return [
+    { k: "first", name: "First decision", desc: "Process your first invoice", have: s.processed, need: 1, ic: "✓" },
+    { k: "handsfree", name: "Hands-free", desc: "Half of all invoices approved with no one touching them", have: s.touchless_rate, need: 50, unit: "%", ic: "⚡" },
+    { k: "dupe", name: "Double-pay blocker", desc: "Stop an invoice that was already paid", have: s.duplicates_blocked, need: 1, ic: "⛔" },
+    { k: "fraud", name: "Fraud spotter", desc: "Hold an invoice with a suspicious bank change", have: s.fraud_held, need: 1, ic: "🛡" },
+    { k: "lakh", name: "Lakh guardian", desc: "Protect ₹1 lakh from repeats and fraud", have: s.value_protected, need: 1e5, money: true, ic: "₹" },
+    { k: "zero", name: "Queue zero", desc: "Clear the review queue completely", have: s.processed && !s.pending_review ? 1 : 0, need: 1, ic: "◎" },
+    { k: "loop", name: "Human in the loop", desc: "Make 5 review decisions", have: s.reviews_total, need: 5, ic: "👤" },
+    { k: "century", name: "Century", desc: "Handle 100 invoices", have: s.processed, need: 100, ic: "💯" },
+  ].map((m) => ({ ...m, done: (m.have || 0) >= m.need, pct: Math.min(100, Math.round((100 * (m.have || 0)) / m.need)) }));
+}
+const chrome = { pending: null, stats: null };
+function paintMomentum(s) {
+  chrome.stats = s;
+  const ms = milestones(s), won = ms.filter((m) => m.done);
+  const today = s.reviews_today || 0, pend = s.pending_review || 0;
+  const pct = pend ? Math.round((100 * today) / (today + pend)) : 100;
+  const el = $("#momentum");
+  el.innerHTML = `<div class="mo-top">
+      <div class="ring" style="--p:${pct}"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15.915"/><circle class="fg" cx="18" cy="18" r="15.915" stroke-dasharray="${pct} 100"/></svg><span>${pend || "✓"}</span></div>
+      <div style="min-width:0"><b>${pend ? `${pend} to clear` : "Queue zero"}</b><div class="faint small">${today} decided today${s.streak_days > 1 ? ` · 🔥 ${s.streak_days}-day streak` : ""}</div></div></div>
+    <a class="mo-wins" href="#/" title="Milestones on the Overview"><span>Milestones</span><span class="mono">${won.length}/${ms.length}</span><i style="width:${(100 * won.length) / ms.length}%"></i></a>`;
+  // celebrate real progress, once
+  if (chrome.pending > 0 && pend === 0) { toast("Queue zero. Every invoice has a decision.", "win"); el.classList.add("celebrate"); setTimeout(() => el.classList.remove("celebrate"), 1400); }
+  chrome.pending = pend;
+  const seen = new Set(store.get("clearap-wins").split(",").filter(Boolean));
+  const fresh = won.filter((m) => !seen.has(m.k));
+  if (fresh.length) {
+    if (store.get("clearap-wins-init")) fresh.slice(0, 2).forEach((m) => toast(`Milestone unlocked: ${m.name}`, "win"));
+    store.set("clearap-wins", [...seen, ...fresh.map((m) => m.k)].join(","));
+  }
+  store.set("clearap-wins-init", "1");
+}
+function milestonesPanel(s) {
+  const ms = milestones(s), won = ms.filter((m) => m.done).length;
+  return `<div class="card panel wins-panel"><div class="panel-head"><div><span class="t">Team wins</span><div class="faint small">${won} of ${ms.length} unlocked · earned from real results, not clicks</div></div>
+    <div class="progress" style="min-width:140px"><span style="width:${(100 * won) / ms.length}%"></span></div></div>
+    <div class="wins">${ms.map((m) => `<div class="win ${m.done ? "done" : ""}" title="${esc(m.desc)}">
+      <span class="wi">${m.ic}</span><div style="min-width:0"><b>${esc(m.name)}</b><div class="faint small">${esc(m.desc)}</div>
+      ${m.done ? `<span class="badge APPROVE">Unlocked</span>` : `<div class="mini"><i style="width:${m.pct}%"></i></div><div class="faint mono" style="font-size:11px">${m.money ? cmoney(m.have || 0) + " / " + cmoney(m.need) : `${Math.round(m.have || 0)}${m.unit || ""} / ${m.need}${m.unit || ""}`}</div>`}</div></div>`).join("")}</div></div>`;
+}
+const greet = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
+const sectionTitle = (t, sub) => `<div class="section-title"><h2>${t}</h2>${sub ? `<p>${sub}</p>` : ""}</div>`;
 function paintWho() {
   const w = $("#who");
   if (session.auth) {
     w.innerHTML = `${icon.user}<span>${esc(session.user)}</span>`;
     w.title = "Signed in. Click to sign out.";
-    w.onclick = async () => { if (!confirm("Sign out?")) return; await fetch("/logout", { method: "POST", headers: { "X-CSRF-Token": session.csrf } }); location.href = "/login"; };
+    w.onclick = async () => { if (!(await ask({ title: "Sign out?", body: "You'll need your username and password to get back in.", ok: "Sign out" }))) return; await fetch("/logout", { method: "POST", headers: { "X-CSRF-Token": session.csrf } }); location.href = "/login"; };
   } else {
     const n = store.get("clearap-reviewer");
     w.innerHTML = `${icon.user}<span>${n ? esc(n) : "Set your name"}</span>`;
     w.title = "Your name is recorded on every review you make";
-    w.onclick = () => { const v = prompt("Your name (recorded on every review you make):", n); if (v != null) { store.set("clearap-reviewer", v.trim().slice(0, 60)); paintWho(); } };
+    w.onclick = async () => {
+      const v = await ask({ title: "What should we call you?", body: "Your name goes on every review you make, so the audit trail shows who decided what.", ok: "Save", input: { value: n, placeholder: "e.g. Priya Nair" }, icon: icon.user });
+      if (v != null) { store.set("clearap-reviewer", v.trim().slice(0, 60)); paintWho(); refreshChrome(); if (v.trim()) toast(`Hi ${v.trim().split(" ")[0]}! Your reviews will be signed with your name.`); }
+    };
   }
 }
 
@@ -220,15 +326,16 @@ async function viewDashboard() {
 
   app.innerHTML = `
   <section class="hero">
-    <span class="eyebrow">Accounts payable · overview</span>
+    <span class="eyebrow">${greet()}${reviewer() ? ", " + esc(reviewer().split(" ")[0]) : ""} · ${new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</span>
     <h1>${s.processed ? `${s.processed} invoice${s.processed === 1 ? "" : "s"} handled. <em>${s.touchless_rate}% needed no one.</em>` : `Invoices in, decisions out. <em>Upload one to start.</em>`}</h1>
-    <p class="muted" style="margin:0;max-width:640px;font-size:16px">ClearAP reads each invoice, checks it against your orders, vendors and past payments, then pays it, sends it to the right person, or rejects it, and tells you why.</p>
+    <p class="muted" style="margin:0;max-width:640px;font-size:16px">NoCap reads every GST invoice, checks it against your purchase orders, vendors and past payments, then pays it, routes it to the right person, or rejects it, and tells you exactly why. No guesswork, no cap.</p>
     <div class="row">
       ${pending.length ? `<a class="attn" href="#/queue"><b>${pending.length}</b>${pending.length === 1 ? "invoice is" : "invoices are"} waiting for you${sla.late ? ` · ${sla.late} overdue` : ""} →</a>` : `<span class="attn ok"><b>0</b>Nothing waiting for review</span>`}
       <a class="btn primary" href="#/inbox">${icon.upload} Upload an invoice</a>
     </div>
   </section>
 
+  ${sectionTitle("At a glance", "The numbers that matter this period")}
   <div class="grid kpis">
     ${kpi("Invoices handled", s.processed, `${kmoney(s.value_processed)} in total${s.filed ? ` · ${s.filed} non-invoice${s.filed === 1 ? "" : "s"} filed` : ""}`, sparkline(spark.handled, "count", (v) => `${v} handled`), "Every invoice that has finished processing.")}
     ${kpi("Done automatically", s.processed ? s.touchless_rate + "%" : "—", `${s.approved} paid with no one touching them`, sparkline(spark.auto, "rate", (v) => `${v}% automatic so far`), "Share of invoices approved and scheduled for payment without a person stepping in. The line shows how that share moved, invoice by invoice.", "accent")}
@@ -238,20 +345,26 @@ async function viewDashboard() {
     ${kpi("Time saved", tl.length ? "~" + saved : "—", `avg ${s.avg_duration_ms ? secs(s.avg_duration_ms) : "—"} per invoice`, sparkline(spark.saved, "min", (v) => `~${v} min saved so far`), "Estimate: ~12 min of manual work saved per auto-approved invoice, ~10 per rejection, ~5 per hold (the evidence is already gathered).")}
   </div>
 
+  ${sectionTitle("Trends &amp; outcomes", "What came in, and what happened to it")}
   <div class="grid chart-row r-2-1">
     ${chartCard("activity", "Invoices over time", "How many came in, and what happened to each", activityChart(tl))}
     ${chartCard("mix", "What happened", "Share of invoices, and the money behind them", mixChart(s, a.money))}
   </div>
+  ${sectionTitle("Risk &amp; workload", "Why invoices get stopped, and who picks them up")}
   <div class="grid chart-row r-1-1">
     ${chartCard("reasons", "Why invoices were stopped", "The checks that sent invoices to a person or rejected them", reasonsChart(a.reasons))}
     ${chartCard("teams", "Who's reviewing", a.reviews.count ? `${a.reviews.count} decided by people · avg ${dur(a.reviews.avg_seconds)} to decide` : "Held invoices by team, and what reviewers decided", teamsChart(a.teams))}
   </div>
+  ${sectionTitle("Spend &amp; engine", "Where the money goes and how the engine performs")}
   <div class="grid chart-row r-1-1-1">
     ${chartCard("stages", "Where the time goes", "Average time per step", stagesChart(a.stage_ms))}
     ${chartCard("vendors", "Top vendors", "Approved spend by vendor", vendorsChart(a.vendors))}
     ${chartCard("readers", "How invoices were read", "Who copied the details off the document", readersChart(a.readers))}
   </div>
 
+  ${sectionTitle("Milestones", "Wins your team has earned")}
+  ${milestonesPanel(s)}
+  ${sectionTitle("Work list", "Every invoice, newest first")}
   <div class="grid dash-cols">
     <div class="card panel">
       <div class="panel-head"><div><span class="t">${dash.archived ? "Archived" : "Recent invoices"}</span>
@@ -303,7 +416,7 @@ async function viewDashboard() {
           ${dash.archived ? `<td class="num"><button class="btn sm" data-restore="${r.id}">Restore</button></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
     $$("[data-restore]").forEach((b) => (b.onclick = async (e) => {
       e.stopPropagation();
-      try { await postJSON(`/api/runs/${b.dataset.restore}/restore`, { actor: reviewer() }); toast("Restored to the working list"); viewDashboard(); } catch (err) { toast(err.message); }
+      try { await postJSON(`/api/runs/${b.dataset.restore}/restore`, { actor: reviewer() }); toast("Restored to the working list"); viewDashboard(); } catch (err) { toast(err.message, "error"); }
     }));
   };
   paint();
@@ -320,13 +433,15 @@ async function viewDashboard() {
   }));
   $("#arch-toggle") && ($("#arch-toggle").onclick = () => { dash.archived = !dash.archived; dash.filter = "all"; viewDashboard(); });
   $("#archive") && ($("#archive").onclick = async () => {
-    if (!confirm("Archive every finished invoice?\n\nThey leave this list and the charts, but nothing is deleted: the history, documents and payment record stay, repeat invoices are still caught, and you can restore any of them. Invoices still waiting for a person are not archived.")) return;
+    if (!(await ask({ title: "Archive every finished invoice?", ok: "Archive", icon: icon.archive,
+      body: `<ul class="m-list"><li>They leave this list and the charts. <b>Nothing is deleted.</b></li><li>History, documents and the payment record stay, and repeat invoices are still caught.</li><li>Invoices still waiting for a person stay put. You can restore any archived invoice.</li></ul>` }))) return;
     try { const r = await postJSON("/api/runs/archive", { actor: reviewer() }); toast(r.archived ? `Archived ${r.archived} invoice${r.archived === 1 ? "" : "s"}` : "Nothing finished to archive"); viewDashboard(); }
-    catch (e) { toast(e.message); }
+    catch (e) { toast(e.message, "error"); }
   });
   $("#reset").onclick = async () => {
-    if (!confirm("Clear all invoices and reset the records?")) return;
-    await api("/api/reset", { method: "POST" }); toast("Demo data reset"); viewDashboard();
+    if (!(await ask({ title: "Reset all demo data?", danger: true, ok: "Reset everything", icon: icon.alert,
+      body: "This permanently clears every invoice, review and document, and puts the ledger back to how it started. <b>It can't be undone.</b> To tidy up without losing history, use <b>Archive finished</b> instead." }))) return;
+    await api("/api/reset", { method: "POST" }); toast("Fresh start. All demo data cleared."); viewDashboard();
   };
   // Keep the overview live while anything is still being processed.
   if (runs.some((r) => r.status === "running")) pollTimer = setTimeout(() => { if ((location.hash || "#/").match(/^#?\/?$/)) viewDashboard(); }, 2000);
@@ -488,7 +603,7 @@ async function viewInbox() {
   const kindCls = (k) => (k.startsWith("Edge") ? "edge" : "");
   app.innerHTML = `
   <div class="page-head">
-    <div><span class="eyebrow">Upload</span><h1>Drop in an invoice</h1><p>Any invoice works: a PDF, a scan, or a photo taken on a phone. Drop one to watch every check live, or drop a whole batch (up to 25) and track them together.</p></div>
+    <div><span class="eyebrow">Inbox</span><h1>Drop in your invoices</h1><p>Any invoice works: a PDF, a scan, or a photo taken on a phone. Drop one to watch every check live, or drop a whole batch (up to 25) and track them together.</p></div>
   </div>
   <label class="drop" id="drop"><input type="file" id="file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/heic,.heic,.jpg,.jpeg,.png,.webp" hidden>
     <span class="ic">${icon.upload}</span>
@@ -529,12 +644,12 @@ async function runSample(name) {
   location.hash = `#/runs/${run_id}`;
 }
 async function uploadBatch(files) {
-  if (files.length > 25) { toast("Up to 25 files at a time"); files = files.slice(0, 25); }
+  if (files.length > 25) { toast("Up to 25 files at a time. The first 25 are on their way.", "info"); files = files.slice(0, 25); }
   const box = $("#batch");
   const fd = new FormData(); files.forEach((f) => fd.append("files", f));
   box.innerHTML = `<div class="card panel batch"><div class="panel-head"><span class="t">Uploading ${files.length} files…</span></div></div>`;
   let res;
-  try { res = (await api("/api/runs/batch", { method: "POST", body: fd })).runs; } catch (e) { box.innerHTML = ""; toast(e.message); return; }
+  try { res = (await api("/api/runs/batch", { method: "POST", body: fd })).runs; } catch (e) { box.innerHTML = ""; toast(e.message, "error"); return; }
   const track = async () => {
     if (!$("#batch")) return; // left the page
     const all = await api("/api/runs");
@@ -557,10 +672,10 @@ async function uploadBatch(files) {
   track();
 }
 async function upload(f) {
-  toast(`Uploading ${f.name}…`);
+  toast(`Uploading ${f.name}…`, "info");
   const fd = new FormData(); fd.append("file", f);
   try { const { run_id } = await api("/api/runs", { method: "POST", body: fd }); location.hash = `#/runs/${run_id}`; }
-  catch (e) { toast(e.message); }
+  catch (e) { toast(e.message, "error"); }
 }
 
 /* ------------------------------------------------------------------ run view */
@@ -742,7 +857,7 @@ function stageData(s, st) {
     return `<div class="faint small" style="margin-bottom:12px">Read by <b>${esc(m.extractor === "gemini" ? "Gemini AI" : m.extractor)}</b>${m.model ? ` · ${esc(m.model)}` : ""}${m.latency_ms ? ` · ${secs(m.latency_ms)}` : ""}${m.input_tokens ? ` · ${m.input_tokens} in / ${m.output_tokens} out tokens` : ""}
       ${(d.notes || []).length ? `<br>${d.notes.map(esc).join(" ")}` : ""}</div>
       ${fieldsHtml(f, conf)}
-      <div class="field" style="margin-top:10px"><div class="k"><span>Bank details printed on the invoice</span></div><div class="v">${esc([bank.bank_name, bank.routing_number && "routing " + bank.routing_number, bank.account_number && "acct " + bank.account_number].filter(Boolean).join(" · ") || "—")}</div>
+      <div class="field" style="margin-top:10px"><div class="k"><span>Bank details printed on the invoice</span></div><div class="v">${esc([bank.bank_name, bank.ifsc && "IFSC " + bank.ifsc, bank.account_number && "A/c " + bank.account_number].filter(Boolean).join(" · ") || "—")}</div>
         ${f.payment_instruction_notes ? `<div class="faint small" style="margin-top:4px">“${esc(f.payment_instruction_notes)}”</div>` : ""}</div>
       <div class="sect"><h3>Line items</h3><div class="table-wrap"><table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead>
       <tbody>${(f.line_items || []).map((l) => `<tr><td>${esc(l.description)}</td><td class="num">${l.quantity ?? "—"}</td><td class="num">${money(l.unit_price)}</td><td class="num">${money(l.amount)}</td></tr>`).join("")}</tbody></table></div></div>`;
@@ -799,13 +914,13 @@ function renderReview(st) {
         <span class="faint small" style="margin-left:auto">Recorded as <b>${esc(reviewer() || "AP Reviewer")}</b></span></div></div></div>
       <div id="fix-form"></div>` : "") + audit;
   if (misfiled) $("#fix").onclick = () => renderFixForm(st);
-  $("#restore") && ($("#restore").onclick = async () => { try { st.run = await postJSON(`/api/runs/${r.id}/restore`, { actor: reviewer() }); toast("Restored"); renderReview(st); } catch (e) { toast(e.message); } });
+  $("#restore") && ($("#restore").onclick = async () => { try { st.run = await postJSON(`/api/runs/${r.id}/restore`, { actor: reviewer() }); toast("Restored"); renderReview(st); } catch (e) { toast(e.message, "error"); } });
   if (pending) {
     $$(".quick button", el).forEach((b) => (b.onclick = () => { $("#note").value = b.dataset.n; $("#note").focus(); }));
     const act = async (action) => {
       try { st.run = await postJSON(`/api/runs/${r.id}/action`, { action, note: $("#note").value, actor: reviewer() });
         toast(action === "approve" ? "Approved and recorded" : "Rejected"); renderReview(st); refreshChrome(); }
-      catch (e) { toast(e.message); }
+      catch (e) { toast(e.message, "error"); }
     };
     $("#ap").onclick = () => act("approve"); $("#rj").onclick = () => act("reject");
     $("#fix").onclick = () => renderFixForm(st);
@@ -843,7 +958,7 @@ function renderFixForm(st) {
     body.line_items = [...$$("#lines tr")].map((tr) => { const g = (n) => tr.querySelector(`[name=${n}]`).value; const num = (n) => (g(n) === "" ? null : Number(g(n)));
       return { description: g("description"), quantity: num("quantity"), unit_price: num("unit_price"), amount: num("amount") }; }).filter((l) => l.description || l.amount != null);
     try { const { run_id } = await postJSON(`/api/runs/${st.run.id}/rekey`, body); toast("Re-checking with the corrected details…"); location.hash = `#/runs/${run_id}`; }
-    catch (e) { toast(e.message); }
+    catch (e) { toast(e.message, "error"); }
   };
 }
 const lineRow = (l) => `<tr><td><input name="description" value="${esc(l.description ?? "")}"></td><td><input name="quantity" type="number" step="any" value="${l.quantity ?? ""}"></td>
@@ -857,7 +972,7 @@ async function viewQueue() {
   const groups = {};
   runs.forEach((r) => (groups[r.route_to] = groups[r.route_to] || []).push(r));
   const late = runs.filter((r) => slaState(r).cls === "late").length;
-  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Needs review</span><h1>${runs.length ? `${runs.length} invoice${runs.length === 1 ? "" : "s"} need${runs.length === 1 ? "s" : ""} a person` : "Nothing to review"}</h1>
+  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Review queue</span><h1>${runs.length ? `${runs.length} invoice${runs.length === 1 ? "" : "s"} need${runs.length === 1 ? "s" : ""} a person` : "Nothing to review"}</h1>
     <p>Only the unusual ones end up here. Each goes to the team best placed to sort it out, with the evidence already attached${late ? `. <b style="color:var(--bad)">${late} past deadline.</b>` : "."}</p></div></div>
   ${runs.length ? Object.values(QUEUE_KEYS).filter((q) => groups[q]).map((q) => `<div class="card panel q-group">
     <div class="panel-head"><label class="selall"><input type="checkbox" data-group="${esc(q)}" aria-label="Select all in ${esc(friendly(q))}">
@@ -878,14 +993,16 @@ async function viewQueue() {
   $("#bulkclear") && ($("#bulkclear").onclick = () => { $$("input[type=checkbox]").forEach((c) => (c.checked = false)); sync(); });
   $$("[data-bulk]").forEach((b) => (b.onclick = async () => {
     const ids = picked(), note = $("#bulknote").value.trim();
-    if (!note) { toast("Add a note first. It goes into each invoice's history."); $("#bulknote").focus(); return; }
-    if (!confirm(`${b.dataset.bulk === "approve" ? "Approve" : "Reject"} ${ids.length} invoice${ids.length === 1 ? "" : "s"}?`)) return;
+    if (!note) { toast("Add a note first. It goes into each invoice's history.", "error"); $("#bulknote").focus(); return; }
+    const yes = b.dataset.bulk === "approve";
+    if (!(await ask({ title: `${yes ? "Approve" : "Reject"} ${ids.length} invoice${ids.length === 1 ? "" : "s"}?`, ok: yes ? "Approve all" : "Reject all", danger: !yes,
+      body: `Your note goes into each invoice's history: <i>“${esc(note)}”</i>` }))) return;
     try {
       const res = await postJSON("/api/runs/bulk-action", { run_ids: ids, action: b.dataset.bulk, note, actor: reviewer() });
       const why = res.results.find((x) => !x.ok)?.error;
       toast(`${res.done} done${res.failed ? ` · ${res.failed} couldn't be (${why})` : ""}`);
       viewQueue();
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, "error"); }
   }));
 }
 
@@ -893,7 +1010,7 @@ async function viewQueue() {
 async function viewData() {
   const [d, dbi] = await Promise.all([api("/api/reference"), api("/api/db")]);
   const vname = Object.fromEntries(d.vendors.map((v) => [v.vendor_id, v.legal_name]));
-  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Records</span><h1>Orders, vendors &amp; payments</h1><p>What every invoice is checked against. The payment record updates each time an invoice is approved, which is how repeat bills and over-billing get caught.</p></div></div>
+  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Ledger &amp; records</span><h1>Orders, vendors &amp; payments</h1><p>What every invoice is checked against. The payment record updates each time an invoice is approved, which is how repeat bills and over-billing get caught.</p></div></div>
   <div class="card pad db-card"><div class="db-head"><div><h3>Database</h3><div class="db-title">${esc(dbi.engine)} · <span class="mono">${esc(dbi.file)}</span> · ${((n) => (n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB"))(dbi.size_bytes)}</div>
       <div class="faint small">Everything lives in this one file: invoices, the payment record, review history, your rules, and the original documents.</div></div>
       <a class="btn sm" href="/api/db/backup" download>${icon.download} Download backup</a></div>
@@ -947,8 +1064,8 @@ async function viewRules() {
   const p = await api("/api/policy");
   const fields = [
     ["price_tolerance_pct", "Price wiggle room (%)", "How far an invoice can be off the order before a person looks"],
-    ["price_tolerance_abs", "Price wiggle room ($)", "…and in dollars. Whichever is smaller wins."],
-    ["high_value_threshold", "Manager sign-off above ($)", "Big invoices get a second look even when everything matches"],
+    ["price_tolerance_abs", "Price wiggle room (₹)", "…and in rupees. Whichever is smaller wins."],
+    ["high_value_threshold", "Manager sign-off above (₹)", "Big invoices get a second look even when everything matches"],
     ["inferred_po_min_confidence", "How sure we must be of a guessed PO", "0 to 1. Below this, the buyer confirms which order it is"],
     ["min_field_confidence", "How sure the AI must be", "0 to 1. Key fields below this go to a person to double-check"],
     ["fuzzy_duplicate_window_days", "Look-alike repeat window (days)", "Same vendor and same amount within this many days counts as a likely repeat"],
@@ -967,7 +1084,7 @@ async function viewRules() {
     ["Duplicate", "The same bill sent twice, sometimes with the number written a bit differently."], ["Remit-to bank", "The account the money is sent to. We only ever pay the one on file."],
     ["GL code", "The accounting category the spend is booked under, e.g. \"6120 Breakroom\"."], ["Split billing", "One order billed across several invoices that together exceed the order."],
     ["Touchless", "Handled from start to finish with no person involved."]];
-  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">How it works</span><h1>The AI reads. The rules decide.</h1><p>The AI's only job is to copy the details off the invoice. Every decision about money comes from clear rules you can see and change below.</p></div></div>
+  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Rules &amp; accuracy</span><h1>The AI reads. The rules decide.</h1><p>The AI's only job is to copy the details off the invoice. Every decision about money comes from clear rules you can see and change below.</p></div></div>
   <div class="card pad"><h2>Eight steps, every invoice</h2><div class="flow">
     ${steps.map(([t, d, w], i) => `<div class="step ${w === "AI" ? "ai" : ""}"><span class="n">${String(i + 1).padStart(2, "0")}</span><b>${t}</b><p>${d}</p><span class="who">${w}</span></div>`).join("")}
   </div></div>
@@ -1021,12 +1138,51 @@ async function viewRules() {
   };
 }
 
+/* ------------------------------------------------------------------ Ask NoCap (assistant) */
+const chat = { msgs: [], busy: false };
+const SUGGEST = ["What's waiting for me?", "How much money have we protected?", "Why was the Kesari invoice held?", "Which invoices were rejected, and why?"];
+function md(text) { // escaped first; then only bold, in-app links and bullet lists
+  const inline = (l) => l.replace(/\[([^\]]+)\]\((#\/[\w\/-]*)\)/g, '<a href="$2">$1</a>').replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  let out = "", list = false;
+  for (const raw of esc(text).split("\n")) {
+    const b = raw.match(/^\s*[-*•]\s+(.*)/);
+    if (b) { if (!list) { out += "<ul>"; list = true; } out += `<li>${inline(b[1])}</li>`; continue; }
+    if (list) { out += "</ul>"; list = false; }
+    if (raw.trim()) out += `<p>${inline(raw)}</p>`;
+  }
+  return out + (list ? "</ul>" : "");
+}
+function paintChat() {
+  const log = $("#chat-log");
+  log.innerHTML = (chat.msgs.length ? "" : `<div class="bubble bot"><p>Hi${reviewer() ? " " + esc(reviewer().split(" ")[0]) : ""}! I'm <b>NoCap</b>, your AP sidekick. Ask me about invoices, vendors, the review queue or the money we've protected. I read the live data; I can't approve or pay anything.</p></div>
+      <div class="chips">${SUGGEST.map((q) => `<button class="chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`)
+    + chat.msgs.map((m) => `<div class="bubble ${m.role === "user" ? "me" : "bot"}">${m.role === "user" ? `<p>${esc(m.text)}</p>` : md(m.text)}</div>`).join("")
+    + (chat.busy ? `<div class="bubble bot typing"><i></i><i></i><i></i></div>` : "");
+  $$(".chip", log).forEach((c) => (c.onclick = () => sendChat(c.dataset.q)));
+  log.scrollTop = log.scrollHeight;
+}
+async function sendChat(text) {
+  text = (text || "").trim();
+  if (!text || chat.busy) return;
+  chat.msgs.push({ role: "user", text }); chat.busy = true; paintChat();
+  try { const r = await postJSON("/api/chat", { messages: chat.msgs.slice(-10) }); chat.msgs.push({ role: "bot", text: r.answer }); }
+  catch (e) { chat.msgs.push({ role: "bot", text: "Sorry, I couldn't answer that just now: " + e.message }); }
+  chat.busy = false; paintChat(); $("#chat-input").focus();
+}
+function openChat() { $("#chat").hidden = false; $("#open-chat").classList.add("on"); paintChat(); setTimeout(() => $("#chat-input").focus(), 30); }
+function closeChat() { $("#chat").hidden = true; $("#open-chat").classList.remove("on"); }
+$("#open-chat").onclick = () => ($("#chat").hidden ? openChat() : closeChat());
+$("#chat-close").onclick = closeChat;
+$("#chat-form").onsubmit = (e) => { e.preventDefault(); const i = $("#chat-input"); const v = i.value; i.value = ""; sendChat(v); };
+$("#chat-log").addEventListener("click", (e) => { if (e.target.closest("a") && innerWidth < 720) closeChat(); });
+
 /* ------------------------------------------------------------------ command palette (⌘K / Ctrl+K) */
 const cmd = { items: [], shown: [], i: 0 };
 async function openCmd() {
   $("#cmd").hidden = false; const inp = $("#cmd-input"); inp.value = ""; inp.focus();
   cmd.items = [
-    ...[["Overview", "#/"], ["Upload an invoice", "#/inbox"], ["Needs review", "#/queue"], ["Vendors", "#/vendors"], ["Records: orders, vendors, payments", "#/data"], ["How it works & rules", "#/rules"]].map(([t, h]) => ({ grp: "Go to", t, s: "", go: () => (location.hash = h) })),
+    ...[["Overview", "#/"], ["Inbox: upload invoices", "#/inbox"], ["Review queue", "#/queue"], ["Vendors", "#/vendors"], ["Ledger & records: POs, vendors, payments", "#/data"], ["Rules & accuracy", "#/rules"]].map(([t, h]) => ({ grp: "Go to", t, s: "", go: () => (location.hash = h) })),
+    { grp: "Actions", t: "Ask NoCap a question", s: "AI assistant", go: () => openChat() },
     { grp: "Actions", t: "Switch light / dark", s: "", go: () => $("#theme").click() },
   ];
   paintCmd();

@@ -27,9 +27,9 @@ _lock = threading.RLock()
 
 DEFAULT_POLICY = {
     "price_tolerance_pct": 2.0,          # max variance vs PO, percent ...
-    "price_tolerance_abs": 500.0,        # ... and absolute USD; the tighter of the two applies
+    "price_tolerance_abs": 40000.0,      # ... and absolute rupees; the tighter of the two applies
     "arithmetic_tolerance": 0.05,        # rounding slack on sums
-    "high_value_threshold": 25000.0,     # above this a controller signs off, even if matched
+    "high_value_threshold": 2500000.0,   # Rs. 25 lakh: above this a controller signs off, even if matched
     "inferred_po_auto_approve": True,    # may an inferred (not quoted) PO be auto-approved?
     "inferred_po_min_confidence": 0.85,
     "min_field_confidence": 0.70,        # below this on a critical field -> human review

@@ -7,7 +7,7 @@
   "fields_total": 89,
   "decision_accuracy": 100.0,
   "decisions_correct": 9,
-  "median_read_seconds": 2.7,
+  "median_read_seconds": 4.5,
   "by_field": [
     {
       "field": "Document type",
@@ -67,7 +67,7 @@
   ],
   "rows": [
     {
-      "sample": "01_happy_northwind_NW-58213.pdf",
+      "sample": "01_happy_sahyadri_SOS-58213.pdf",
       "kind": "Happy path",
       "decision": "APPROVE",
       "route": "Auto-approved \u2192 payment run",
@@ -78,11 +78,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3224,
-      "seconds": 3.9
+      "read_ms": 4506,
+      "seconds": 5.1
     },
     {
-      "sample": "02_edge_split_billing_atlas_ATL-INV-1209.pdf",
+      "sample": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
       "kind": "Edge case 1",
       "decision": "HOLD",
       "route": "Procurement / Buyer",
@@ -93,11 +93,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2212,
-      "seconds": 2.2
+      "read_ms": 4130,
+      "seconds": 4.3
     },
     {
-      "sample": "03_edge_scanned_no_po_brightline_BLX-30871.pdf",
+      "sample": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
       "kind": "Edge case 2",
       "decision": "APPROVE",
       "route": "Auto-approved \u2192 payment run",
@@ -108,11 +108,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2669,
-      "seconds": 2.9
+      "read_ms": 4043,
+      "seconds": 4.1
     },
     {
-      "sample": "04_edge_disguised_duplicate_meridian_INV-2026-0417.pdf",
+      "sample": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
       "kind": "Edge case 3",
       "decision": "REJECT",
       "route": "Rejected: duplicate",
@@ -123,11 +123,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2848,
-      "seconds": 3.1
+      "read_ms": 3890,
+      "seconds": 4.1
     },
     {
-      "sample": "05_edge_bank_change_keystone_KFM-2026-1147.pdf",
+      "sample": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
       "kind": "Edge case 4",
       "decision": "HOLD",
       "route": "Treasury & Fraud",
@@ -138,11 +138,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2711,
-      "seconds": 2.9
+      "read_ms": 6657,
+      "seconds": 6.7
     },
     {
-      "sample": "06_variant_tolerance_pinnacle_PPP-7734.pdf",
+      "sample": "06_variant_tolerance_pragati_PPP-7734.pdf",
       "kind": "Extra input",
       "decision": "APPROVE",
       "route": "Auto-approved \u2192 payment run",
@@ -153,11 +153,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2517,
-      "seconds": 2.7
+      "read_ms": 4183,
+      "seconds": 4.3
     },
     {
-      "sample": "07_variant_missing_fields_halcyon.pdf",
+      "sample": "07_variant_missing_fields_annapurna.pdf",
       "kind": "Extra input",
       "decision": "REJECT",
       "route": "Returned to vendor",
@@ -168,11 +168,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2590,
-      "seconds": 2.7
+      "read_ms": 9394,
+      "seconds": 9.6
     },
     {
-      "sample": "08_variant_phone_photo_northwind_NW-58377.jpg",
+      "sample": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
       "kind": "Extra input",
       "decision": "APPROVE",
       "route": "Auto-approved \u2192 payment run",
@@ -183,11 +183,11 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2807,
-      "seconds": 3.1
+      "read_ms": 8447,
+      "seconds": 8.6
     },
     {
-      "sample": "09_variant_quote_pinnacle_Q-2291.pdf",
+      "sample": "09_variant_quote_pragati_Q-2291.pdf",
       "kind": "Extra input",
       "decision": "NOT_INVOICE",
       "route": "Filed: not an invoice",
@@ -198,8 +198,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3091,
-      "seconds": 3.3
+      "read_ms": 8534,
+      "seconds": 8.8
     }
   ]
 }

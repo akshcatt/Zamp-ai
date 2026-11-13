@@ -43,7 +43,7 @@ def autoload_samples(wait: bool = False) -> int:
             rid = pipeline.start_run(p.read_bytes(), p.name, "sample (auto-loaded)", saved_read=True)
             while (db.get_run(rid) or {}).get("status") == "running":
                 time.sleep(0.1)
-        print(f"ClearAP: auto-loaded {len(files)} sample invoices", flush=True)
+        print(f"NoCap: auto-loaded {len(files)} sample invoices", flush=True)
 
     if wait:
         go()
@@ -59,7 +59,7 @@ def keep_awake(url: str, every_s: int = 600) -> None:
             try:
                 urllib.request.urlopen(url.rstrip("/") + "/healthz", timeout=10).read()
             except Exception as e:  # never let the pinger take the app down
-                print(f"ClearAP: keep-awake ping failed: {e}", flush=True)
+                print(f"NoCap: keep-awake ping failed: {e}", flush=True)
 
     threading.Thread(target=loop, daemon=True).start()
 

@@ -1,166 +1,168 @@
 {
   "company": {
-    "legal_name": "Lumen Home Goods, Inc.",
+    "legal_name": "Lumen Home Goods Pvt. Ltd.",
     "aliases": [
       "Lumen Home Goods",
-      "Lumen Home Goods Inc"
+      "Lumen Home Goods Pvt Ltd",
+      "Lumen Home Goods Private Limited"
     ],
-    "address": "410 Hudson Street, New York, NY 10014",
-    "base_currency": "USD"
+    "address": "4th Floor, Prestige Tech Park, Outer Ring Road, Marathahalli, Bengaluru, Karnataka 560103",
+    "gstin": "29AAECL4821K1Z3",
+    "base_currency": "INR"
   },
   "vendors": [
     {
       "vendor_id": "V-1001",
-      "legal_name": "Northwind Office Supplies Inc.",
+      "legal_name": "Sahyadri Office Supplies Pvt. Ltd.",
       "aliases": [
-        "Northwind Office Supplies",
-        "Northwind Supplies"
+        "Sahyadri Office Supplies",
+        "Sahyadri Supplies"
       ],
-      "tax_id": "94-3127756",
+      "tax_id": "29AAKCS3127M1Z6",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "2/10 Net 30",
-      "email_domain": "northwindsupplies.com",
-      "phone_on_file": "+1 (212) 555-0141",
+      "email_domain": "sahyadrisupplies.in",
+      "phone_on_file": "+91 80 4123 0141",
       "bank": {
-        "bank_name": "JPMorgan Chase Bank, N.A.",
-        "routing_number": "021000021",
-        "account_number": "000123454417"
+        "bank_name": "HDFC Bank Ltd.",
+        "ifsc": "HDFC0000523",
+        "account_number": "50200012345417"
       }
     },
     {
       "vendor_id": "V-1002",
-      "legal_name": "Atlas Cloud Services LLC",
+      "legal_name": "Kaveri Cloud Solutions LLP",
       "aliases": [
-        "Atlas Cloud Services",
-        "Atlas Cloud"
+        "Kaveri Cloud Solutions",
+        "Kaveri Cloud"
       ],
-      "tax_id": "47-2210983",
+      "tax_id": "27AAPFK2210Q1Z9",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 30",
-      "email_domain": "atlascloud.io",
-      "phone_on_file": "+1 (415) 555-0178",
+      "email_domain": "kavericloud.in",
+      "phone_on_file": "+91 20 6712 0178",
       "bank": {
-        "bank_name": "Silicon Valley Bank",
-        "routing_number": "121140399",
-        "account_number": "3300918842"
+        "bank_name": "ICICI Bank Ltd.",
+        "ifsc": "ICIC0001829",
+        "account_number": "182905009188"
       }
     },
     {
       "vendor_id": "V-1003",
-      "legal_name": "Brightline Logistics Ltd.",
+      "legal_name": "Ganga Freight Carriers Pvt. Ltd.",
       "aliases": [
-        "Brightline Logistics",
-        "Brightline Freight"
+        "Ganga Freight Carriers",
+        "Ganga Freight"
       ],
-      "tax_id": "36-4419270",
+      "tax_id": "27AAGCG4419R1Z2",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 45",
-      "email_domain": "brightlinelogistics.com",
-      "phone_on_file": "+1 (312) 555-0122",
+      "email_domain": "gangafreight.co.in",
+      "phone_on_file": "+91 22 2851 0122",
       "bank": {
-        "bank_name": "BMO Bank N.A.",
-        "routing_number": "071000288",
-        "account_number": "2209914460"
+        "bank_name": "Axis Bank Ltd.",
+        "ifsc": "UTIB0000412",
+        "account_number": "912020044601460"
       }
     },
     {
       "vendor_id": "V-1004",
-      "legal_name": "Meridian Industrial Parts Co.",
+      "legal_name": "Meenakshi Industrial Spares Co.",
       "aliases": [
-        "Meridian Industrial Parts",
-        "Meridian Industrial"
+        "Meenakshi Industrial Spares",
+        "Meenakshi Spares"
       ],
-      "tax_id": "22-3098817",
+      "tax_id": "33AAHFM3098P1Z4",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 30",
-      "email_domain": "meridianparts.com",
-      "phone_on_file": "+1 (973) 555-0190",
+      "email_domain": "meenakshispares.com",
+      "phone_on_file": "+91 44 2625 0190",
       "bank": {
-        "bank_name": "TD Bank, N.A.",
-        "routing_number": "031201360",
-        "account_number": "4410287736"
+        "bank_name": "State Bank of India",
+        "ifsc": "SBIN0000800",
+        "account_number": "38410287736"
       }
     },
     {
       "vendor_id": "V-1005",
-      "legal_name": "Keystone Facilities Management Inc.",
+      "legal_name": "Kesari Facility Services Pvt. Ltd.",
       "aliases": [
-        "Keystone Facilities Management",
-        "Keystone FM",
-        "Keystone Facilities"
+        "Kesari Facility Services",
+        "Kesari FS",
+        "Kesari Facilities"
       ],
-      "tax_id": "13-5582014",
+      "tax_id": "29AAJCK5582N1Z8",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 30",
-      "email_domain": "keystonefm.com",
-      "phone_on_file": "+1 (718) 555-0163",
+      "email_domain": "kesarifacility.in",
+      "phone_on_file": "+91 80 4718 0163",
       "bank": {
-        "bank_name": "Wells Fargo Bank, N.A.",
-        "routing_number": "121000248",
+        "bank_name": "Kotak Mahindra Bank Ltd.",
+        "ifsc": "KKBK0008066",
         "account_number": "4031557781"
       }
     },
     {
       "vendor_id": "V-1006",
-      "legal_name": "Pinnacle Print & Packaging LLC",
+      "legal_name": "Pragati Print & Packaging",
       "aliases": [
-        "Pinnacle Print & Packaging",
-        "Pinnacle Print and Packaging",
-        "Pinnacle Packaging"
+        "Pragati Print and Packaging",
+        "Pragati Packaging",
+        "Pragati Print"
       ],
-      "tax_id": "11-3374520",
+      "tax_id": "29ABBFP3374E1Z1",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 30",
-      "email_domain": "pinnacleprint.com",
-      "phone_on_file": "+1 (516) 555-0137",
+      "email_domain": "pragatiprint.in",
+      "phone_on_file": "+91 80 2837 0137",
       "bank": {
-        "bank_name": "Citibank, N.A.",
-        "routing_number": "021000089",
-        "account_number": "6672019934"
+        "bank_name": "Canara Bank",
+        "ifsc": "CNRB0002611",
+        "account_number": "2611201019934"
       }
     },
     {
       "vendor_id": "V-1007",
-      "legal_name": "Halcyon Catering Co.",
+      "legal_name": "Annapurna Caterers",
       "aliases": [
-        "Halcyon Catering",
-        "Halcyon Events & Catering"
+        "Annapurna Catering",
+        "Annapurna Events & Caterers"
       ],
-      "tax_id": "13-4471209",
+      "tax_id": "29AQRPA4471H1Z5",
       "status": "active",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 15",
-      "email_domain": "halcyoncatering.com",
-      "phone_on_file": "+1 (646) 555-0119",
+      "email_domain": "annapurnacaterers.in",
+      "phone_on_file": "+91 98450 10119",
       "bank": {
-        "bank_name": "Bank of America, N.A.",
-        "routing_number": "026009593",
-        "account_number": "4830021175"
+        "bank_name": "Bank of Baroda",
+        "ifsc": "BARB0INDIRA",
+        "account_number": "48300200021175"
       }
     },
     {
       "vendor_id": "V-1008",
-      "legal_name": "Vertex Tooling Corp.",
+      "legal_name": "Vajra Tooling Works",
       "aliases": [
-        "Vertex Tooling"
+        "Vajra Tooling"
       ],
-      "tax_id": "38-2290114",
+      "tax_id": "29AAKFV2290C1Z0",
       "status": "blocked",
       "status_reason": "Failed annual compliance review (sanctions screening), 2026-09-30",
-      "currency": "USD",
+      "currency": "INR",
       "payment_terms": "Net 30",
-      "email_domain": "vertextooling.com",
-      "phone_on_file": "+1 (248) 555-0104",
+      "email_domain": "vajratooling.in",
+      "phone_on_file": "+91 80 2839 0104",
       "bank": {
-        "bank_name": "Comerica Bank",
-        "routing_number": "072000096",
-        "account_number": "1851203347"
+        "bank_name": "Yes Bank Ltd.",
+        "ifsc": "YESB0000118",
+        "account_number": "011863400003347"
       }
     }
   ],
@@ -169,7 +171,7 @@
       "po_number": "PO-2026-0311",
       "vendor_id": "V-1001",
       "issue_date": "2026-10-20",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
       "buyer": "Priya Nair (Workplace Ops)",
       "cost_center": "CC-410 Workplace",
@@ -179,9 +181,9 @@
         {
           "line_no": 1,
           "sku": "PPR-A4-10",
-          "description": "A4 copy paper, 80gsm (case of 10 reams)",
+          "description": "A4 copier paper, 75gsm (box of 10 reams)",
           "qty": 40,
-          "unit_price": 38.5,
+          "unit_price": 3080.0,
           "gl_account": "6100 Office Supplies"
         },
         {
@@ -189,7 +191,7 @@
           "sku": "TNR-HP58A",
           "description": "HP 58A black toner cartridge",
           "qty": 12,
-          "unit_price": 96.0,
+          "unit_price": 7680.0,
           "gl_account": "6100 Office Supplies"
         },
         {
@@ -197,7 +199,7 @@
           "sku": "CHR-ERG-M",
           "description": "Ergonomic mesh office chair",
           "qty": 6,
-          "unit_price": 289.0,
+          "unit_price": 23120.0,
           "gl_account": "6150 Furniture (expensed)"
         }
       ]
@@ -206,19 +208,19 @@
       "po_number": "PO-2026-0287",
       "vendor_id": "V-1002",
       "issue_date": "2026-09-01",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
-      "buyer": "Daniel Okafor (Data Platform)",
+      "buyer": "Rohan Mehta (Data Platform)",
       "cost_center": "CC-220 Engineering",
       "receipt_required": false,
-      "description": "Data platform implementation \u2014 time & materials, capped at 320 hours",
+      "description": "Data platform implementation — time & materials, capped at 320 hours",
       "lines": [
         {
           "line_no": 1,
           "sku": "SVC-IMPL-HR",
           "description": "Data platform implementation consulting (hourly)",
           "qty": 320,
-          "unit_price": 150.0,
+          "unit_price": 12000.0,
           "gl_account": "6420 Professional Services"
         }
       ]
@@ -227,19 +229,19 @@
       "po_number": "PO-2026-0342",
       "vendor_id": "V-1003",
       "issue_date": "2026-10-27",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
-      "buyer": "Marcus Lee (Supply Chain)",
+      "buyer": "Arjun Reddy (Supply Chain)",
       "cost_center": "CC-310 Distribution",
       "receipt_required": true,
-      "description": "Outbound LTL freight, Chicago DC to Columbus store cluster (3 loads)",
+      "description": "Outbound part-truckload freight, Bhiwandi DC to Pune store cluster (3 loads)",
       "lines": [
         {
           "line_no": 1,
-          "sku": "FRT-LTL-CHI-CMH",
-          "description": "LTL freight, Chicago IL to Columbus OH",
+          "sku": "FRT-PTL-BHW-PNQ",
+          "description": "Part-truckload freight, Bhiwandi to Pune",
           "qty": 3,
-          "unit_price": 1240.0,
+          "unit_price": 99200.0,
           "gl_account": "5300 Freight Out"
         },
         {
@@ -247,15 +249,15 @@
           "sku": "FRT-FUEL",
           "description": "Fuel surcharge (8%)",
           "qty": 1,
-          "unit_price": 297.6,
+          "unit_price": 23808.0,
           "gl_account": "5300 Freight Out"
         },
         {
           "line_no": 3,
-          "sku": "FRT-LIFT",
-          "description": "Liftgate delivery",
+          "sku": "FRT-HAMALI",
+          "description": "Unloading / hamali charges",
           "qty": 3,
-          "unit_price": 85.0,
+          "unit_price": 6800.0,
           "gl_account": "5300 Freight Out"
         }
       ]
@@ -264,19 +266,19 @@
       "po_number": "PO-2026-0298",
       "vendor_id": "V-1003",
       "issue_date": "2026-09-25",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
-      "buyer": "Marcus Lee (Supply Chain)",
+      "buyer": "Arjun Reddy (Supply Chain)",
       "cost_center": "CC-310 Distribution",
       "receipt_required": false,
-      "description": "Overflow warehouse storage, Oct\u2013Dec 2026",
+      "description": "Overflow warehouse storage, Bhiwandi, Oct–Dec 2026",
       "lines": [
         {
           "line_no": 1,
           "sku": "WH-STOR-MO",
           "description": "Pallet storage, overflow warehouse (monthly)",
           "qty": 3,
-          "unit_price": 2000.0,
+          "unit_price": 160000.0,
           "gl_account": "5350 Warehousing"
         }
       ]
@@ -285,9 +287,9 @@
       "po_number": "PO-2026-0275",
       "vendor_id": "V-1004",
       "issue_date": "2026-09-18",
-      "currency": "USD",
+      "currency": "INR",
       "status": "closed",
-      "buyer": "Marcus Lee (Supply Chain)",
+      "buyer": "Arjun Reddy (Supply Chain)",
       "cost_center": "CC-330 Maintenance",
       "receipt_required": true,
       "description": "Conveyor maintenance spares",
@@ -297,7 +299,7 @@
           "sku": "BRG-6204",
           "description": "Ball bearing 6204-2RS",
           "qty": 500,
-          "unit_price": 4.2,
+          "unit_price": 336.0,
           "gl_account": "6600 Repairs & Maintenance"
         },
         {
@@ -305,7 +307,7 @@
           "sku": "HOS-HYD-36",
           "description": "Hydraulic hose assembly 1/2 in x 36 in",
           "qty": 40,
-          "unit_price": 62.5,
+          "unit_price": 5000.0,
           "gl_account": "6600 Repairs & Maintenance"
         },
         {
@@ -313,7 +315,7 @@
           "sku": "BLT-B48",
           "description": "V-belt B48",
           "qty": 120,
-          "unit_price": 11.75,
+          "unit_price": 940.0,
           "gl_account": "6600 Repairs & Maintenance"
         }
       ]
@@ -322,27 +324,27 @@
       "po_number": "PO-2026-0330",
       "vendor_id": "V-1005",
       "issue_date": "2026-10-01",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
       "buyer": "Priya Nair (Workplace Ops)",
       "cost_center": "CC-410 Workplace",
       "receipt_required": false,
-      "description": "HQ facilities services, November 2026",
+      "description": "Bengaluru HQ facility services, November 2026",
       "lines": [
         {
           "line_no": 1,
           "sku": "FM-JAN-MO",
-          "description": "Janitorial services, November 2026",
+          "description": "Housekeeping services, November 2026",
           "qty": 1,
-          "unit_price": 7850.0,
+          "unit_price": 628000.0,
           "gl_account": "6300 Facilities"
         },
         {
           "line_no": 2,
           "sku": "FM-WIN-QTR",
-          "description": "Exterior window cleaning (quarterly)",
+          "description": "Facade glass cleaning (quarterly)",
           "qty": 1,
-          "unit_price": 1200.0,
+          "unit_price": 96000.0,
           "gl_account": "6300 Facilities"
         }
       ]
@@ -351,9 +353,9 @@
       "po_number": "PO-2026-0356",
       "vendor_id": "V-1006",
       "issue_date": "2026-10-22",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
-      "buyer": "Sofia Alvarez (E-commerce)",
+      "buyer": "Sneha Kulkarni (E-commerce)",
       "cost_center": "CC-510 E-commerce",
       "receipt_required": true,
       "description": "Holiday packaging run",
@@ -363,7 +365,7 @@
           "sku": "BOX-12108-2C",
           "description": "Custom corrugated shipping box 12x10x8, 2-colour print",
           "qty": 2000,
-          "unit_price": 1.85,
+          "unit_price": 148.0,
           "gl_account": "5200 Packaging"
         },
         {
@@ -371,7 +373,7 @@
           "sku": "TIS-2030-BR",
           "description": "Branded tissue paper 20x30 (ream)",
           "qty": 50,
-          "unit_price": 42.0,
+          "unit_price": 3360.0,
           "gl_account": "5200 Packaging"
         }
       ]
@@ -380,19 +382,19 @@
       "po_number": "PO-2026-0361",
       "vendor_id": "V-1007",
       "issue_date": "2026-10-30",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
-      "buyer": "Hannah Brooks (People Team)",
+      "buyer": "Ananya Iyer (People Team)",
       "cost_center": "CC-120 People",
       "receipt_required": false,
-      "description": "Q4 all-hands catering",
+      "description": "Q4 town hall catering",
       "lines": [
         {
           "line_no": 1,
           "sku": "CAT-EVT",
-          "description": "Event catering, Q4 all-hands (120 guests)",
+          "description": "Event catering, Q4 town hall (120 guests)",
           "qty": 1,
-          "unit_price": 3450.0,
+          "unit_price": 276000.0,
           "gl_account": "6700 Events"
         }
       ]
@@ -401,27 +403,27 @@
       "po_number": "PO-2026-0368",
       "vendor_id": "V-1001",
       "issue_date": "2026-11-02",
-      "currency": "USD",
+      "currency": "INR",
       "status": "open",
       "buyer": "Priya Nair (Workplace Ops)",
       "cost_center": "CC-410 Workplace",
       "receipt_required": true,
-      "description": "Breakroom and cleaning supplies, November",
+      "description": "Pantry and housekeeping supplies, November",
       "lines": [
         {
           "line_no": 1,
-          "sku": "BRK-COF-1KG",
-          "description": "Whole-bean coffee 1 kg",
+          "sku": "PAN-COF-1KG",
+          "description": "Filter coffee powder 1 kg",
           "qty": 10,
-          "unit_price": 24.0,
+          "unit_price": 1920.0,
           "gl_account": "6120 Breakroom"
         },
         {
           "line_no": 2,
           "sku": "CLN-PTWL-CS",
-          "description": "Paper towels (case of 12 rolls)",
+          "description": "Tissue rolls (case of 12)",
           "qty": 8,
-          "unit_price": 31.5,
+          "unit_price": 2520.0,
           "gl_account": "6120 Breakroom"
         },
         {
@@ -429,7 +431,7 @@
           "sku": "CLN-WIPE-80",
           "description": "Disinfectant wipes, 80 ct",
           "qty": 12,
-          "unit_price": 7.25,
+          "unit_price": 580.0,
           "gl_account": "6120 Breakroom"
         }
       ]
@@ -462,21 +464,21 @@
       "line_no": 1,
       "qty_received": 3,
       "received_date": "2026-11-07",
-      "grn": "POD-88213/19/27"
+      "grn": "LR-88213/19/27"
     },
     {
       "po_number": "PO-2026-0342",
       "line_no": 2,
       "qty_received": 1,
       "received_date": "2026-11-07",
-      "grn": "POD-88213/19/27"
+      "grn": "LR-88213/19/27"
     },
     {
       "po_number": "PO-2026-0342",
       "line_no": 3,
       "qty_received": 3,
       "received_date": "2026-11-07",
-      "grn": "POD-88213/19/27"
+      "grn": "LR-88213/19/27"
     },
     {
       "po_number": "PO-2026-0275",
@@ -538,34 +540,34 @@
   "invoice_ledger": [
     {
       "vendor_id": "V-1002",
-      "invoice_number": "ATL-INV-1182",
+      "invoice_number": "KCS-INV-1182",
       "invoice_date": "2026-09-30",
-      "net_amount": 30000.0,
-      "total_amount": 30000.0,
+      "net_amount": 2400000.0,
+      "total_amount": 2832000.0,
       "po_number": "PO-2026-0287",
       "status": "paid",
       "posted_at": "2026-10-02",
-      "payment_ref": "ACH-77104",
-      "note": "200 hrs @ $150, September"
+      "payment_ref": "UTR-77104",
+      "note": "200 hrs @ Rs. 12,000, September"
     },
     {
       "vendor_id": "V-1004",
       "invoice_number": "INV 2026/0417",
       "invoice_date": "2026-10-08",
-      "net_amount": 6010.0,
-      "total_amount": 6543.39,
+      "net_amount": 480800.0,
+      "total_amount": 567344.0,
       "po_number": "PO-2026-0275",
       "status": "paid",
       "posted_at": "2026-10-14",
-      "payment_ref": "ACH-77812",
+      "payment_ref": "UTR-77812",
       "note": "Full PO billed"
     },
     {
       "vendor_id": "V-1003",
-      "invoice_number": "BLX-30544",
+      "invoice_number": "GFC-30544",
       "invoice_date": "2026-10-31",
-      "net_amount": 2000.0,
-      "total_amount": 2000.0,
+      "net_amount": 160000.0,
+      "total_amount": 188800.0,
       "po_number": "PO-2026-0298",
       "status": "posted",
       "posted_at": "2026-11-03",

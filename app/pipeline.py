@@ -56,8 +56,21 @@ LIVE_LOCK = threading.Lock()
 
 
 # ============================================================ helpers
+GST_SLABS = (0.25, 3, 5, 12, 18, 28, 40)  # GST rate slabs in India (combined CGST+SGST or IGST)
+
+
+def inr(x: float) -> str:
+    """Indian digit grouping: 1234567.5 -> '12,34,567.50'."""
+    neg, x = x < 0, abs(round(float(x), 2))
+    whole, frac = f"{x:.2f}".split(".")
+    head, tail = whole[:-3], whole[-3:]
+    while len(head) > 2:
+        tail, head = head[-2:] + "," + tail, head[:-2]
+    return ("-" if neg else "") + (head + "," + tail if head else tail) + "." + frac
+
+
 def money(x: float | None) -> str:
-    return "n/a" if x is None else f"${x:,.2f}"
+    return "n/a" if x is None else "₹" + inr(x)
 
 
 def chk(id, label, status, detail, outcome=None, route=None, evidence=None) -> dict:
@@ -173,7 +186,7 @@ def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None, sav
             run_id, status="done", finished_at=db.now_iso(), decision=dec["decision"], route_to=dec.get("route_name"),
             headline=dec["headline"], vendor_id=vendor.get("vendor_id"),
             vendor_name=vendor.get("legal_name") or inv.get("vendor_name"), invoice_number=inv.get("invoice_number"),
-            total=inv.get("total_amount"), currency=inv.get("currency") or "USD",
+            total=inv.get("total_amount"), currency=inv.get("currency") or "INR",
             po_number=(ctx.get("po") or {}).get("po_number"), duration_ms=int((time.time() - t_start) * 1000),
             extractor=(ctx.get("extract_meta") or {}).get("extractor"),
             review_status="pending" if dec["decision"] == "HOLD" else None,
@@ -424,7 +437,7 @@ def _normalise(d: dict) -> dict:
     for k in ("invoice_number", "po_reference", "vendor_name"):
         if isinstance(inv.get(k), str):
             inv[k] = inv[k].strip() or None
-    inv["currency"] = (inv.get("currency") or "USD").upper()
+    inv["currency"] = (inv.get("currency") or "INR").upper()
     # Reconcile a common reader slip: freight listed as a line item AND reported again as shipping.
     ship, sub, tax, tot = inv.get("shipping_amount"), inv.get("subtotal"), inv.get("tax_amount") or 0, inv.get("total_amount")
     if ship and sub is not None and tot is not None and not inv.get("tax_inclusive"):
@@ -503,12 +516,14 @@ def st_validate(ctx):
     ctx["net_amount"] = r2(net)
     if tax and net:
         rate = 100 * tax / (net if not inv.get("tax_inclusive") else net)
-        plausible = 0 < rate <= 15
-        checks.append(chk("val.tax", "Tax rate plausible", "pass" if plausible else "fail",
-                          f"Effective tax rate {rate:.3f}% on {money(net)}" + ("" if plausible else ". Outside the 0–15% range."),
+        slab = min(GST_SLABS, key=lambda r: abs(r - rate))
+        plausible = abs(slab - rate) <= 0.15 or (0 < rate <= 28 and len(inv.get("line_items") or []) > 1)  # mixed-rate lines blend
+        checks.append(chk("val.tax", "GST rate is a valid slab", "pass" if plausible else "fail",
+                          f"Effective GST {rate:.2f}% on {money(net)}" + (f" (the {slab:g}% slab)" if abs(slab - rate) <= 0.15 else "")
+                          + ("" if plausible else f". Not a GST slab ({', '.join(f'{x:g}%' for x in GST_SLABS)})."),
                           None if plausible else "hold", None if plausible else "ap"))
     else:
-        checks.append(chk("val.tax", "Tax rate plausible", "info", "No tax charged (typical for services and freight)"))
+        checks.append(chk("val.tax", "GST rate is a valid slab", "info", "No GST charged on this invoice (e.g. reverse charge, exempt supply, or GST billed separately)"))
 
     # dates
     d, due, today = iso(inv.get("invoice_date")), iso(inv.get("due_date")), TODAY()
@@ -542,7 +557,7 @@ def st_validate(ctx):
         if inv.get("invoice_number"):
             probes["invoice_number"] = re.sub(r"\s+", "", inv["invoice_number"]) in flat
         if total is not None:
-            probes["total_amount"] = f"{total:,.2f}" in flat or f"{total:.2f}" in flat
+            probes["total_amount"] = inr(total) in flat or f"{total:,.2f}" in flat or f"{total:.2f}" in flat
         if inv.get("po_reference"):
             probes["po_reference"] = re.sub(r"\s+", "", inv["po_reference"]) in flat
         acct = (inv.get("bank_details") or {}).get("account_number")
@@ -610,16 +625,16 @@ def st_vendor(ctx):
     bank = inv.get("bank_details") or {}
     mb = best["bank"]
     fraud_signals = []
-    if bank.get("account_number") or bank.get("routing_number"):
+    if bank.get("account_number") or bank.get("ifsc"):
         acct_ok = (bank.get("account_number") or "") == mb["account_number"]
-        rout_ok = (bank.get("routing_number") or mb["routing_number"]) == mb["routing_number"]
+        rout_ok = (bank.get("ifsc") or mb["ifsc"]).upper().replace(" ", "") == mb["ifsc"]
         if acct_ok and rout_ok:
             checks.append(chk("ven.bank", "Remit-to bank matches master", "pass",
                               f"Account ••••{mb['account_number'][-4:]} at {mb['bank_name']} matches the vendor master"))
         else:
             fraud_signals.append("bank account differs from vendor master")
             checks.append(chk("ven.bank", "Remit-to bank matches master", "fail",
-                              f"Invoice says {bank.get('bank_name') or 'a bank'} routing {bank.get('routing_number')} acct ••••{(bank.get('account_number') or '????')[-4:]}; "
+                              f"Invoice says {bank.get('bank_name') or 'a bank'} IFSC {bank.get('ifsc')} a/c ••••{(bank.get('account_number') or '????')[-4:]}; "
                               f"master has {mb['bank_name']} ••••{mb['account_number'][-4:]}",
                               "hold", "fraud", evidence={"invoice": bank, "master_last4": mb["account_number"][-4:]}))
     else:
@@ -1018,7 +1033,7 @@ def _payment_plan(inv, vendor, po, ctx) -> dict:
         acct = row.get("gl") or (po["lines"][0]["gl_account"] if po else "2000 Suspense")
         gl[acct] = round(gl.get(acct, 0) + (row["qty"] or 0) * (row.get("inv_price") or 0), 2)
     if inv.get("tax_amount"):
-        gl["Sales/use tax (expensed with lines)"] = inv["tax_amount"]
+        gl["GST input tax credit (CGST/SGST/IGST receivable)"] = inv["tax_amount"]
     plan["gl_coding"] = [{"account": k, "amount": v} for k, v in gl.items()]
     plan["cost_center"] = po.get("cost_center")
     return plan

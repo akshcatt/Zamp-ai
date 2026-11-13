@@ -86,7 +86,7 @@ def test_split_billing_suggests_partial(env, monkeypatch):
     monkeypatch.setattr(pl, "llm_available", lambda: True)
     monkeypatch.setattr(pl, "extract_with_gemini", lambda pdf, text: (truth(spec), {"extractor": "truth"}))
     r = run_sync(pl, db, ROOT / "samples" / spec["file"])
-    assert r["trace"]["decision"]["partial_approval_amount"] == 18000.0
+    assert r["trace"]["decision"]["partial_approval_amount"] == 1440000.0
 
 
 def test_inferred_po_is_correct(env, monkeypatch):
@@ -197,12 +197,12 @@ def test_double_counted_shipping_is_reconciled(env, monkeypatch):
     db, pl = env
     spec = next(s for s in G.SAMPLES if s["id"] == "variant_within_tolerance")
     t = truth(spec)
-    t["shipping_amount"] = 45.0
+    t["shipping_amount"] = 3600.0
     monkeypatch.setattr(pl, "llm_available", lambda: True)
     monkeypatch.setattr(pl, "extract_with_gemini", lambda pdf, text: (t, {"extractor": "truth"}))
     r = run_sync(pl, db, ROOT / "samples" / spec["file"])
     assert r["decision"] == "APPROVE", r["headline"]
-    assert r["trace"]["stages"]["po_match"]["data"]["variance"] == 45.0
+    assert r["trace"]["stages"]["po_match"]["data"]["variance"] == 3600.0
 
 
 # ---------------------------------------------------------------- database

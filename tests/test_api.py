@@ -141,7 +141,7 @@ def test_vendor_profiles_and_exports(monkeypatch):
     run_sample(c, "edge_bank_change_fraud")
     v = c.get("/api/vendors").json()
     assert len(v["vendors"]) == 8
-    keystone = next(x for x in v["vendors"] if x["name"].startswith("Keystone"))
+    keystone = next(x for x in v["vendors"] if x["name"].startswith("Kesari"))
     assert keystone["waiting"] == 1 and "Bank-change attempt seen" in keystone["flags"]
     blocked = next(x for x in v["vendors"] if x["status"] != "active")
     assert "Blocked in vendor master" in blocked["flags"]
@@ -196,7 +196,7 @@ def test_non_invoice_is_filed_not_rejected(monkeypatch):
     assert s["processed"] == 1 and s["rejected"] == 0 and s["filed"] == 1 and s["touchless_rate"] == 100.0
     assert all(t["decision"] != "NOT_INVOICE" for t in c.get("/api/analytics").json()["timeline"])
     # safety valve: if it was really an invoice, a reviewer can key it in and re-check
-    r = c.post(f"/api/runs/{q['id']}/rekey", json={"invoice_number": "Q-2291", "total_amount": 4950, "vendor_name": "Pinnacle Print & Packaging LLC",
+    r = c.post(f"/api/runs/{q['id']}/rekey", json={"invoice_number": "Q-2291", "total_amount": 396000, "vendor_name": "Pragati Print & Packaging",
                                                     "note": "Vendor confirmed this is their bill"})
     assert r.status_code == 200, r.text
     assert wait(c, r.json()["run_id"])["extractor"] == "manual"

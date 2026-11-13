@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="ClearAP reads invoices, checks them against orders, vendors and past payments, and decides: pay, review, or reject." />
+  <meta name="description" content="NoCap reads GST invoices, checks them against purchase orders, vendors and past payments, and decides: pay, review, or reject." />
   <meta name="theme-color" content="#171717" />
-  <title>ClearAP · Invoice to Decision</title>
+  <title>NoCap · Invoice to Decision</title>
   <script>try { const t = localStorage.getItem("clearap-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,28 +14,59 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23171717'/><path d='M9.5 16.5l4.5 4.5 8.5-9.5' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="#/" aria-label="ClearAP home">
-      <span class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M9.5 16.5l4.5 4.5 8.5-9.5" stroke="var(--bg)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <b>ClearAP</b>
-    </a>
-    <nav id="nav" aria-label="Main">
-      <a href="#/" data-route="dashboard">Overview</a>
-      <a href="#/inbox" data-route="inbox">Upload</a>
-      <a href="#/queue" data-route="queue">Needs review <span id="queue-count" class="pill-count" hidden></span></a>
-      <a href="#/vendors" data-route="vendors">Vendors</a>
-      <a href="#/data" data-route="data">Records</a>
-      <a href="#/rules" data-route="rules">How it works</a>
-    </nav>
-    <div class="top-actions">
-      <button class="kbd-btn" id="open-cmd" title="Search (⌘K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search</span><kbd>⌘K</kbd></button>
-      <button class="icon-btn" id="theme" title="Switch light / dark" aria-label="Switch light or dark theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></button>
-      <div class="mode" id="mode" title="Which engine reads the invoices"></div>
-      <button class="who" id="who" type="button"></button>
-      <a class="btn primary sm hide-sm" href="#/inbox">Upload invoice</a>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar" aria-label="Sections">
+      <a class="brand" href="#/" aria-label="NoCap home">
+        <span class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M9.5 16.5l4.5 4.5 8.5-9.5" stroke="var(--bg)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span><b>NoCap</b><small>Accounts payable autopilot</small></span>
+      </a>
+      <a class="btn primary side-cta" href="#/inbox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Upload invoices</a>
+      <nav id="nav" aria-label="Main">
+        <div class="nav-group">Workspace</div>
+        <a href="#/" data-route="dashboard"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM14 4v4h6V4zM4 20h6v-4H4z"/></svg><span>Overview</span></a>
+        <a href="#/inbox" data-route="inbox"><svg viewBox="0 0 24 24"><path d="M4 13h4l2 3h4l2-3h4"/><path d="M5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/></svg><span>Inbox</span></a>
+        <a href="#/queue" data-route="queue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg><span>Review queue</span><span id="queue-count" class="pill-count" hidden></span></a>
+        <div class="nav-group">Insights</div>
+        <a href="#/vendors" data-route="vendors"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></svg><span>Vendors</span></a>
+        <a href="#/data" data-route="data"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span>Ledger &amp; records</span></a>
+        <div class="nav-group">Engine</div>
+        <a href="#/rules" data-route="rules"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Rules &amp; accuracy</span></a>
+      </nav>
+      <div class="momentum" id="momentum"></div>
+      <div class="side-foot">
+        <div class="mode" id="mode" title="Which engine reads the invoices"></div>
+        <div class="side-row">
+          <button class="who" id="who" type="button"></button>
+          <button class="icon-btn" id="theme" title="Switch light / dark" aria-label="Switch light or dark theme"></button>
+        </div>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim" hidden></div>
+    <div class="main-col">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menu" aria-label="Open sections" aria-controls="sidebar" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="crumb" id="crumb"></div>
+        <div class="top-actions">
+          <button class="kbd-btn" id="open-cmd" title="Search (⌘K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search invoices, vendors…</span><kbd>⌘K</kbd></button>
+          <button class="btn sm ask-btn" id="open-chat" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><span>Ask NoCap</span></button>
+        </div>
+      </header>
+      <main id="app"></main>
     </div>
-  </header>
-  <main id="app"></main>
+  </div>
+
+  <aside class="chat" id="chat" hidden aria-label="Ask NoCap">
+    <div class="chat-head">
+      <div><b>Ask NoCap</b><div class="faint small" id="chat-sub">Answers from your live invoices. Read-only.</div></div>
+      <button class="icon-btn" id="chat-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="chat-log" id="chat-log" aria-live="polite"></div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" placeholder="e.g. What's waiting for me?" autocomplete="off" maxlength="500" />
+      <button class="btn primary sm" type="submit" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+    </form>
+  </aside>
+
   <div id="cmd" class="cmd" hidden>
     <div class="cmd-box" role="dialog" aria-label="Search">
       <input id="cmd-input" placeholder="Search invoices, vendors, pages…" autocomplete="off" />
@@ -43,7 +74,8 @@
       <div class="cmd-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
     </div>
   </div>
-  <div id="toast" class="toast" hidden></div>
+  <div id="modal" class="modal" hidden></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
   <script src="/static/app.js"></script>
 </body>
 </html>
