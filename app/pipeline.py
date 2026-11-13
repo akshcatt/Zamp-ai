@@ -108,8 +108,7 @@ def r2(x):
 # ============================================================ run orchestration
 def start_run(pdf_bytes: bytes, filename: str, source: str) -> str:
     run_id = datetime.now().strftime("R%y%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
-    path = db.UPLOADS / f"{run_id}.pdf"
-    path.write_bytes(pdf_bytes)
+    db.put_file(run_id, pdf_bytes)
     db.insert_run({"id": run_id, "created_at": db.now_iso(), "filename": filename, "source": source,
                    "sha256": hashlib.sha256(pdf_bytes).hexdigest(), "status": "running",
                    "trace_json": "{}", "events_json": "[]"})
@@ -292,7 +291,7 @@ def st_intake(ctx):
             ctx["halt"] = True
             return {"summary": "Image could not be decoded.", "checks": checks, "data": data}
         ctx["pdf"] = pdf
-        (db.UPLOADS / f"{ctx['run_id']}.pdf").write_bytes(pdf)  # what the reviewer sees in the viewer
+        db.put_file(ctx["run_id"], pdf)  # what the reviewer sees in the viewer
         data.update(info)
         checks.append(chk("intake.format", "Supported file type", "pass",
                           f"{FORMAT_NAMES[fmt]} ({info['original_px']} px). Auto-rotated and converted to a one-page PDF, then read like a scan."))

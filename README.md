@@ -35,7 +35,7 @@ The repo includes a `Dockerfile` and a `render.yaml`:
 - **Render:** New → Blueprint → point it at this repo → set `GEMINI_API_KEY`.
 - **Railway / Fly / Hugging Face Spaces (Docker):** same image. It listens on `$PORT`.
 
-Storage is SQLite inside the container. On free tiers it resets on redeploy. That's fine for a demo, and "Reset demo data" on the Overview page does the same thing on purpose.
+Storage is a single SQLite database file (`data/ap.db`). It holds the invoices, the payment record, the review history, your rules, the saved AI reads, and the original documents. **Records → Database** shows what's in it and has a **Download backup** button, a consistent snapshot taken even while invoices are running. On Render's free tier the container's disk resets on redeploy. That's fine for a demo, and "Reset demo data" on the Overview page does the same thing on purpose.
 
 ## What's in the box
 
@@ -43,7 +43,7 @@ Storage is SQLite inside the container. On free tiers it resets on redeploy. Tha
 |---|---|
 | `app/pipeline.py` | The 8-stage pipeline, every check, the decision engine, payment plan, vendor emails |
 | `app/extract.py` | Gemini extraction (PDF in, strict JSON schema out, per-field confidence) plus the heuristic fallback |
-| `app/db.py` | SQLite: runs, invoice ledger, audit trail, editable policy, extraction cache |
+| `app/db.py` | SQLite (WAL mode, one file): runs, invoice ledger, audit trail, editable policy, extraction cache, uploaded documents; backup snapshot |
 | `app/seed/master_data.json` | The "ERP": 8 vendors (one blocked), 8 POs, goods receipts, invoice history |
 | `app/main.py` | FastAPI: REST, plus Server-Sent Events for the live run view |
 | `static/` | The UI: overview, upload, live invoice view (with side-by-side document check), needs-review list with deadlines, records, how it works. Light/dark theme, ⌘K search, CSV export |

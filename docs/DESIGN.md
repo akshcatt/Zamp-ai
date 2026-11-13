@@ -86,7 +86,7 @@ Three extra inputs show the "close but not exact", "communicate back" and "it is
 
 - **Rules over ML for decisions.** Less clever, far more trustworthy. Thresholds live in the UI, not the code.
 - **Synchronous single-invoice pipeline**, with live streaming so a human can follow it. Batch throughput would come from a queue (see next steps).
-- **SQLite and a JSON "ERP".** That's enough to make matching stateful and realistic. In production it's an ERP connector (NetSuite, SAP, Coupa).
+- **SQLite and a JSON "ERP".** One database file holds every run, the ledger, the audit trail, the policy and the original documents. That keeps backup a single file and lets the dashboard read while a run writes (WAL mode). It's enough to make matching stateful and realistic. In production the reference data comes from an ERP connector (NetSuite, SAP, Coupa), and the store moves to a managed database with a mounted volume or point-in-time recovery.
 - **Graceful degradation** over hard dependencies: Gemini, then cached extraction, then heuristic parser, then human. The system never auto-approves on a failed read.
 - **Demo pacing** (≈450 ms minimum per stage) so viewers can follow. The extraction stage is real latency. Set `DEMO_PACING_MS=0` to switch pacing off.
 

@@ -201,7 +201,7 @@ def test_photo_is_converted_and_treated_as_scan(env, monkeypatch):
     assert seen["pdf_header"] == b"%PDF-"          # reader receives a PDF, not the JPEG
     assert seen["text"].strip() == ""               # no text layer -> scan path
     assert r["trace"]["stages"]["analyze"]["data"]["scanned"] is True
-    assert (db.UPLOADS / f"{r['id']}.pdf").read_bytes()[:5] == b"%PDF-"  # viewer gets the converted PDF
+    assert db.get_file(r["id"])[0][:5] == b"%PDF-"  # viewer gets the converted PDF (stored in the DB)
     assert r["decision"] == "APPROVE"
 
 
@@ -238,3 +238,42 @@ def test_double_counted_shipping_is_reconciled(env, monkeypatch):
     r = run_sync(pl, db, ROOT / "samples" / spec["file"])
     assert r["decision"] == "APPROVE", r["headline"]
     assert r["trace"]["stages"]["po_match"]["data"]["variance"] == 45.0
+
+
+# ---------------------------------------------------------------- database
+def test_everything_is_in_one_sqlite_file_and_survives_restart(env):
+    """Runs, ledger postings, the audit trail and the uploaded document all persist in ap.db."""
+    import sqlite3
+    db, pl = env
+    spec = next(s for s in G.SAMPLES if s["id"] == "happy_path")
+    r = run_sync(pl, db, ROOT / "samples" / spec["file"])
+    assert r["decision"] == "APPROVE"
+    assert not (db.DATA_DIR / "uploads").exists()            # no loose files on disk
+    # Simulate a process restart: drop the module (and its connection), reopen the same file.
+    db._conn.close()
+    importlib.reload(db)
+    db.init()
+    again = db.get_run(r["id"])
+    assert again["decision"] == "APPROVE" and again["audit"]
+    assert db.get_file(r["id"])[0][:5] == b"%PDF-"
+    assert any(l["source_run_id"] == r["id"] for l in db.ledger_rows())
+    info = db.info()
+    assert info["engine"].startswith("SQLite") and info["counts"]["runs"] == 1 and info["counts"]["files"] == 1
+    # The backup is a valid, self-contained SQLite database with the same data.
+    snap = Path(tempfile.mkdtemp()) / "b.db"
+    snap.write_bytes(db.backup_bytes())
+    with sqlite3.connect(snap) as c:
+        assert c.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+        assert c.execute("SELECT COUNT(*) FROM files").fetchone()[0] == 1
+
+
+def test_reset_clears_runs_and_files_but_keeps_seed_ledger(env):
+    db, pl = env
+    seeded = len(db.ledger_rows())
+    run_sync(pl, db, ROOT / "samples" / G.SAMPLES[0]["file"])
+    db.set_policy({"price_tolerance_pct": 0.5})
+    db.init(reset=True)
+    c = db.info()["counts"]
+    assert c["runs"] == 0 and c["files"] == 0 and c["audit"] == 0
+    assert len(db.ledger_rows()) == seeded
+    assert db.get_policy()["price_tolerance_pct"] == 2.0

@@ -547,10 +547,14 @@ async function viewQueue() {
 
 /* ------------------------------------------------------------------ data */
 async function viewData() {
-  const d = await api("/api/reference");
+  const [d, dbi] = await Promise.all([api("/api/reference"), api("/api/db")]);
   const vname = Object.fromEntries(d.vendors.map((v) => [v.vendor_id, v.legal_name]));
   app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Records</span><h1>Orders, vendors &amp; payments</h1><p>What every invoice is checked against. The payment record updates each time an invoice is approved, which is how repeat bills and over-billing get caught.</p></div></div>
-  <div class="card panel"><div class="panel-head"><span class="t">Purchase orders ${tip("A purchase order (PO) is what we agreed to buy, at what price, before the invoice arrives.")}</span></div><div class="table-wrap"><table>
+  <div class="card pad db-card"><div class="db-head"><div><h3>Database</h3><div class="db-title">${esc(dbi.engine)} · <span class="mono">${esc(dbi.file)}</span> · ${((n) => (n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB"))(dbi.size_bytes)}</div>
+      <div class="faint small">Everything lives in this one file: invoices, the payment record, review history, your rules, and the original documents.</div></div>
+      <a class="btn sm" href="/api/db/backup" download>${icon.download} Download backup</a></div>
+    <div class="db-stats">${[["runs", "Invoices processed"], ["files", "Documents stored"], ["ledger", "Payment records"], ["audit", "History entries"], ["extraction_cache", "Saved AI reads"]].map(([k, l]) => `<div><b>${dbi.counts[k] ?? 0}</b><span>${l}</span></div>`).join("")}</div></div>
+  <div class="card panel" style="margin-top:16px"><div class="panel-head"><span class="t">Purchase orders ${tip("A purchase order (PO) is what we agreed to buy, at what price, before the invoice arrives.")}</span></div><div class="table-wrap"><table>
     <thead><tr><th>PO</th><th>Vendor</th><th>What for</th><th>Status</th><th class="num">Order value</th><th class="num">Billed so far</th><th>Used up</th><th>Check type ${tip("2-way: invoice vs order. 3-way: invoice vs order vs goods actually received.")}</th></tr></thead>
     <tbody>${d.purchase_orders.map((p) => { const pc = Math.min(100, (100 * p.prior_billed) / p.po_total);
       return `<tr><td class="mono">${esc(p.po_number)}</td><td>${esc(p.vendor)}</td><td class="muted">${esc(p.description)}<div class="faint" style="font-size:12px">${esc(p.buyer)}</div></td>

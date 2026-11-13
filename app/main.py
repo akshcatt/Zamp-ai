@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -21,7 +21,7 @@ MAX_BYTES = 20 * 1024 * 1024
 
 app = FastAPI(title="Invoice-to-Decision", version="1.0")
 db.init()
-print(f"ClearAP ready: data={db.DATA_DIR} reader={'gemini ' + MODEL if llm_available() else 'heuristic (no GEMINI_API_KEY)'}", flush=True)
+print(f"ClearAP ready: db={db.DB_PATH} reader={'gemini ' + MODEL if llm_available() else 'heuristic (no GEMINI_API_KEY)'}", flush=True)
 
 
 @app.get("/api/health")
@@ -77,10 +77,23 @@ def run(run_id: str):
 
 @app.get("/api/runs/{run_id}/file")
 def run_file(run_id: str):
-    p = db.UPLOADS / f"{run_id}.pdf"
-    if not p.exists():
+    f = db.get_file(run_id)
+    if not f:
         raise HTTPException(404)
-    return FileResponse(p, media_type="application/pdf")
+    data, mime = f
+    return Response(content=data, media_type=mime, headers={"Content-Disposition": f'inline; filename="{run_id}.pdf"'})
+
+
+@app.get("/api/db")
+def db_info():
+    return db.info()
+
+
+@app.get("/api/db/backup")
+def db_backup():
+    name = f"clearap-{db.now_iso()[:10]}.db"
+    return Response(content=db.backup_bytes(), media_type="application/vnd.sqlite3",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @app.get("/api/runs/{run_id}/events")
