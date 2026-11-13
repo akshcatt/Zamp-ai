@@ -136,15 +136,33 @@ async function refreshChrome() {
 }
 
 /* ------------------------------------------------------------------ dashboard */
-const dash = { filter: "all", q: "" };
+// Outcome colors are chart tokens (validated per theme). Fixed order everywhere: Approved · Needs review · Rejected.
+const OUT = [["APPROVE", "Approved", "var(--c-ok)"], ["HOLD", "Needs review", "var(--c-hold)"], ["REJECT", "Rejected", "var(--c-bad)"]];
+const STAGE_NAME = Object.fromEntries(STAGES.map(([k, l]) => [k, l]));
+const READER_NAME = { gemini: "Gemini AI", heuristic: "Basic text reader", cache: "Re-used earlier AI read", manual: "Typed by a person", none: "Not read" };
+const dash = { filter: "all", q: "", tables: {} };
+
 async function viewDashboard() {
-  const [s, runs] = await Promise.all([api("/api/stats"), api("/api/runs")]);
+  const [s, runs, a] = await Promise.all([api("/api/stats"), api("/api/runs"), api("/api/analytics")]);
   refreshChrome();
   const pending = runs.filter((r) => r.decision === "HOLD" && (!r.review_status || r.review_status === "pending") && r.status !== "running");
-  const done = runs.filter((r) => r.status !== "running");
-  const savedMin = done.reduce((a, r) => a + (MANUAL_MIN[r.decision] || 0), 0);
+  const tl = a.timeline;
+  const savedMin = tl.reduce((x, r) => x + (MANUAL_MIN[r.decision] || 0), 0);
   const saved = savedMin >= 60 ? (savedMin / 60).toFixed(1) + " h" : savedMin + " min";
-  const late = pending.filter((r) => slaState(r).cls === "late").length;
+  const sla = { ok: 0, soon: 0, late: 0 };
+  pending.forEach((r) => sla[slaState(r).cls || "ok"]++);
+
+  // Cumulative series for the KPI sparklines, one point per finished invoice.
+  const cum = (f) => { let acc = 0; return tl.map((r, i) => (acc += f(r, i))); };
+  let ap = 0;
+  const spark = {
+    handled: cum(() => 1),
+    auto: tl.map((r, i) => ((ap += r.decision === "APPROVE" ? 1 : 0), Math.round((100 * ap) / (i + 1)))),
+    stopped: cum((r) => (r.decision === "REJECT" ? 1 : 0)),
+    protectedAmt: cum((r) => r.protected),
+    saved: cum((r) => MANUAL_MIN[r.decision] || 0),
+    speed: tl.map((r) => r.ms / 1000),
+  };
 
   app.innerHTML = `
   <section class="hero">
@@ -152,18 +170,34 @@ async function viewDashboard() {
     <h1>${s.processed ? `${s.processed} invoice${s.processed === 1 ? "" : "s"} handled. <em>${s.touchless_rate}% needed no one.</em>` : `Invoices in, decisions out. <em>Upload one to start.</em>`}</h1>
     <p class="muted" style="margin:0;max-width:640px;font-size:16px">ClearAP reads each invoice, checks it against your orders, vendors and past payments, then pays it, sends it to the right person, or rejects it, and tells you why.</p>
     <div class="row">
-      ${pending.length ? `<a class="attn" href="#/queue"><b>${pending.length}</b>${pending.length === 1 ? "invoice is" : "invoices are"} waiting for you${late ? ` · ${late} overdue` : ""} →</a>` : `<span class="attn ok"><b>0</b>Nothing waiting for review</span>`}
+      ${pending.length ? `<a class="attn" href="#/queue"><b>${pending.length}</b>${pending.length === 1 ? "invoice is" : "invoices are"} waiting for you${sla.late ? ` · ${sla.late} overdue` : ""} →</a>` : `<span class="attn ok"><b>0</b>Nothing waiting for review</span>`}
       <a class="btn primary" href="#/inbox">${icon.upload} Upload an invoice</a>
     </div>
   </section>
+
   <div class="grid kpis">
-    ${kpi("Invoices handled", s.processed, `${kmoney(s.value_processed)} in total`, "", "Every invoice that has finished processing.")}
-    ${kpi("Done automatically", s.processed ? s.touchless_rate + "%" : "—", `${s.approved} paid with no one touching them`, "accent", "Share of invoices approved and scheduled for payment without a person stepping in.")}
-    ${kpi("Waiting for a person", s.pending_review, pending.length ? `${late ? late + " past deadline" : "all within deadline"}` : "queue is clear", "", "Invoices on hold, each with the team that owns the problem.")}
-    ${kpi("Stopped", s.rejected, "repeats, missing info, blocked vendors", "", "Invoices that should not be paid as sent.")}
-    ${kpi("Money protected", kmoney(s.value_protected), "repeat bills + suspicious bank changes", "", "The value of duplicate invoices blocked plus invoices held for possible fraud.")}
-    ${kpi("Time saved", done.length ? "~" + saved : "—", `avg ${s.avg_duration_ms ? secs(s.avg_duration_ms) : "—"} per invoice`, "", "Estimate: ~12 min of manual work saved per auto-approved invoice, ~10 per rejection, ~5 per hold (the evidence is already gathered).")}
+    ${kpi("Invoices handled", s.processed, `${kmoney(s.value_processed)} in total`, sparkline(spark.handled, "count", (v) => `${v} handled`), "Every invoice that has finished processing.")}
+    ${kpi("Done automatically", s.processed ? s.touchless_rate + "%" : "—", `${s.approved} paid with no one touching them`, sparkline(spark.auto, "rate", (v) => `${v}% automatic so far`), "Share of invoices approved and scheduled for payment without a person stepping in. The line shows how that share moved, invoice by invoice.", "accent")}
+    ${kpi("Waiting for a person", s.pending_review, pending.length ? (sla.late ? `${sla.late} past deadline` : "all within deadline") : "queue is clear", slaBar(sla), "Invoices on hold, split by how close they are to their review deadline.")}
+    ${kpi("Stopped", s.rejected, "repeats, missing info, blocked vendors", sparkline(spark.stopped, "count", (v) => `${v} stopped so far`), "Invoices that should not be paid as sent.")}
+    ${kpi("Money protected", kmoney(s.value_protected), "repeat bills + suspicious bank changes", sparkline(spark.protectedAmt, "money", (v) => `${kmoney(v)} protected so far`), "Value of duplicate invoices blocked plus invoices held for possible fraud.")}
+    ${kpi("Time saved", tl.length ? "~" + saved : "—", `avg ${s.avg_duration_ms ? secs(s.avg_duration_ms) : "—"} per invoice`, sparkline(spark.saved, "min", (v) => `~${v} min saved so far`), "Estimate: ~12 min of manual work saved per auto-approved invoice, ~10 per rejection, ~5 per hold (the evidence is already gathered).")}
   </div>
+
+  <div class="grid chart-row r-2-1">
+    ${chartCard("activity", "Invoices over time", "How many came in, and what happened to each", activityChart(tl))}
+    ${chartCard("mix", "What happened", "Share of invoices, and the money behind them", mixChart(s, a.money))}
+  </div>
+  <div class="grid chart-row r-1-1">
+    ${chartCard("reasons", "Why invoices were stopped", "The checks that sent invoices to a person or rejected them", reasonsChart(a.reasons))}
+    ${chartCard("teams", "Who's reviewing", a.reviews.count ? `${a.reviews.count} decided by people · avg ${dur(a.reviews.avg_seconds)} to decide` : "Held invoices by team, and what reviewers decided", teamsChart(a.teams))}
+  </div>
+  <div class="grid chart-row r-1-1-1">
+    ${chartCard("stages", "Where the time goes", "Average time per step", stagesChart(a.stage_ms))}
+    ${chartCard("vendors", "Top vendors", "Approved spend by vendor", vendorsChart(a.vendors))}
+    ${chartCard("readers", "How invoices were read", "Who copied the details off the document", readersChart(a.readers))}
+  </div>
+
   <div class="grid dash-cols">
     <div class="card panel">
       <div class="panel-head"><span class="t">Recent invoices</span>
@@ -175,10 +209,6 @@ async function viewDashboard() {
       <div id="runs-table"></div>
     </div>
     <div class="grid">
-      <div class="card pad">
-        <h3>What happened</h3>
-        ${donut(s)}
-      </div>
       <div class="card pad">
         <h3>Needs your attention</h3>
         <div class="side-list">${pending.length ? pending.slice(0, 5).map((r) => { const sl = slaState(r);
@@ -214,6 +244,12 @@ async function viewDashboard() {
   $("#q").oninput = (e) => { dash.q = e.target.value; paint(); };
   $("#chips").onclick = (e) => { const f = e.target.dataset.f; if (!f) return; dash.filter = f; $$("#chips button").forEach((b) => b.classList.toggle("on", b.dataset.f === f)); paint(); };
   $("#csv").onclick = () => exportCsv(runs);
+  $$("[data-view]").forEach((b) => (b.onclick = () => {
+    const id = b.dataset.view; dash.tables[id] = !dash.tables[id];
+    const card = b.closest(".chart-card");
+    card.classList.toggle("as-table", dash.tables[id]);
+    b.textContent = dash.tables[id] ? "Chart" : "Table";
+  }));
   $("#reset").onclick = async () => {
     if (!confirm("Clear all invoices and reset the records?")) return;
     await api("/api/reset", { method: "POST" }); toast("Demo data reset"); viewDashboard();
@@ -221,17 +257,145 @@ async function viewDashboard() {
   // Keep the overview live while anything is still being processed.
   if (runs.some((r) => r.status === "running")) pollTimer = setTimeout(() => { if ((location.hash || "#/").match(/^#?\/?$/)) viewDashboard(); }, 2000);
 }
-const kpi = (label, value, sub, cls = "", help = "") => `<div class="card kpi ${cls}"><div class="label">${label}${help ? tip(help) : ""}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
-function donut(s) {
-  const segs = [["Approved", s.approved, "var(--ok)"], ["Needs review", s.held, "var(--warn)"], ["Rejected", s.rejected, "var(--bad)"]];
-  const n = s.processed || 0, C = 2 * Math.PI * 42;
-  let off = 0;
-  const arcs = n ? segs.filter(([, v]) => v).map(([, v, c]) => { const len = (C * v) / n, a = `<circle r="42" cx="56" cy="56" stroke="${c}" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 56 56)"/>`; off += len; return a; }).join("") : "";
-  return `<div class="donut-wrap"><svg class="donut" viewBox="0 0 112 112" role="img" aria-label="Outcome mix">
-      <circle r="42" cx="56" cy="56" stroke="var(--surface-3)"/>${arcs}
-      <text x="56" y="56" text-anchor="middle" font-size="22" font-weight="500" dy="2">${n}</text><text x="56" y="72" text-anchor="middle" font-size="9.5" fill="var(--ink-3)" style="fill:var(--ink-3)">invoices</text></svg>
-    <div class="legend">${segs.map(([l, v, c]) => `<span><span><i style="background:${c}"></i>${l}</span><b>${v}${n ? ` <span class="faint" style="font-weight:400">· ${Math.round((100 * v) / n)}%</span>` : ""}</b></span>`).join("")}</div></div>`;
+
+const dur = (sec) => (sec == null ? "—" : sec < 60 ? Math.round(sec) + " s" : sec < 3600 ? Math.round(sec / 60) + " min" : (sec / 3600).toFixed(1) + " h");
+const kpi = (label, value, sub, chart = "", help = "", cls = "") => `<div class="card kpi ${cls}"><div class="label">${label}${help ? tip(help) : ""}</div>
+  <div class="kpi-row"><div class="value">${value}</div><div class="kpi-chart">${chart}</div></div><div class="sub">${sub}</div></div>`;
+
+/* ---- chart primitives: plain HTML/SVG, theme tokens, hover tooltips (data-ct), table fallback */
+function chartCard(id, title, sub, { chart, table, legend = "" }) {
+  const on = !!dash.tables[id];
+  return `<div class="card chart-card ${on ? "as-table" : ""}">
+    <div class="chart-head"><div style="min-width:0"><div class="chart-title">${title}</div><div class="faint small">${sub}</div></div>
+      ${table ? `<button class="btn sm ghost view-btn" data-view="${id}" title="Switch between chart and table">${on ? "Chart" : "Table"}</button>` : ""}</div>
+    ${legend}<div class="chart-body">${chart}</div>${table ? `<div class="table-body">${table}</div>` : ""}</div>`;
 }
+const legendHtml = (items) => `<div class="legend row chart-legend">${items.map(([l, c]) => `<span><span><i style="background:${c}"></i>${l}</span></span>`).join("")}</div>`;
+const tableHtml = (head, rows) => `<div class="table-wrap"><table class="mini"><thead><tr>${head.map((h, i) => `<th class="${i ? "num" : ""}">${h}</th>`).join("")}</tr></thead>
+  <tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i ? "num" : ""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+const emptyChart = (msg = "Run a few invoices to fill this in.") => ({ chart: `<div class="chart-empty">${msg}</div>`, table: "" });
+
+function sparkline(vals, kind, fmt) {
+  if (vals.length < 2) return "";
+  const w = 120, h = 36, max = Math.max(...vals), min = kind === "rate" ? 0 : Math.min(0, ...vals), span = max - min || 1;
+  const pts = vals.map((v, i) => [(i / (vals.length - 1)) * w, h - 3 - ((v - min) / span) * (h - 6)]);
+  const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
+  const [lx, ly] = pts[pts.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Trend: ${esc(fmt(vals[vals.length - 1]))}" data-ct="${esc(fmt(vals[vals.length - 1]))}">
+    <path d="${d}L${w},${h}L0,${h}Z" class="spark-area"/><path d="${d}" class="spark-line" vector-effect="non-scaling-stroke"/>
+    <circle cx="${lx}" cy="${ly}" r="3" class="spark-dot"/></svg>`;
+}
+function slaBar(sla) {
+  const n = sla.ok + sla.soon + sla.late;
+  if (!n) return "";
+  const seg = [["On time", sla.ok, "var(--c-ok)"], ["Due soon", sla.soon, "var(--c-hold)"], ["Overdue", sla.late, "var(--c-bad)"]].filter(([, v]) => v);
+  return `<div class="stackbar thin" role="img" aria-label="Review deadlines">${seg.map(([l, v, c]) => `<span style="flex:${v};background:${c}" data-ct="${l}: ${v}"></span>`).join("")}</div>`;
+}
+
+function activityChart(tl) {
+  if (!tl.length) return emptyChart();
+  const t0 = toDate(tl[0].t).getTime(), t1 = toDate(tl[tl.length - 1].t).getTime();
+  const steps = [10e3, 30e3, 60e3, 5 * 60e3, 15 * 60e3, 3600e3, 6 * 3600e3, 86400e3, 7 * 86400e3];
+  const step = steps.find((s) => (t1 - t0) / s < 20) || steps[steps.length - 1];
+  const MIN_COLS = 8; // a short demo still reads as a timeline, with the activity at the right
+  const last = Math.floor(t1 / step) * step;
+  const start = Math.min(Math.floor(t0 / step) * step, last - (MIN_COLS - 1) * step), nb = Math.floor((last - start) / step) + 1;
+  const buckets = Array.from({ length: nb }, (_, i) => ({ t: start + i * step, APPROVE: 0, HOLD: 0, REJECT: 0, total: 0 }));
+  tl.forEach((r) => { const b = buckets[Math.floor((toDate(r.t).getTime() - start) / step)]; b[r.decision]++; b.total += r.total || 0; });
+  const max = Math.max(...buckets.map((b) => b.APPROVE + b.HOLD + b.REJECT));
+  const top = max <= 4 ? max || 1 : Math.ceil(max / 2) * 2;
+  const lab = (t) => { const d = new Date(t); return step >= 86400e3 ? d.toLocaleDateString([], { month: "short", day: "numeric" })
+    : d.toLocaleTimeString([], step < 60e3 ? { hour: "2-digit", minute: "2-digit", second: "2-digit" } : { hour: "2-digit", minute: "2-digit" }); };
+  const every = Math.ceil(nb / 6);
+  const chart = `<div class="cols-chart" role="img" aria-label="Invoices per ${dur(step / 1000)} by result">
+    <div class="y-axis"><span>${top}</span><span>${top / 2 % 1 ? "" : top / 2}</span><span>0</span></div>
+    <div class="plot"><div class="grid-lines"><i></i><i></i><i></i></div>
+      <div class="cols">${buckets.map((b, i) => { const n = b.APPROVE + b.HOLD + b.REJECT;
+        const tipTxt = `<b>${lab(b.t)}</b><br>${n} invoice${n === 1 ? "" : "s"} · ${money(b.total)}${OUT.map(([k, l]) => (b[k] ? `<br>${l}: ${b[k]}` : "")).join("")}`;
+        return `<div class="col" data-ct="${esc(tipTxt)}"><div class="area"><div class="stack" style="height:${(100 * n) / top}%">${OUT.map(([k, , c]) => (b[k] ? `<span style="flex:${b[k]};background:${c}"></span>` : "")).join("")}</div></div>
+          <div class="x">${i % every === 0 ? lab(b.t) : ""}</div></div>`; }).join("")}</div></div></div>`;
+  return { chart, legend: legendHtml(OUT.map(([, l, c]) => [l, c])),
+    table: tableHtml(["Time", "Approved", "Needs review", "Rejected", "Value"], buckets.filter((b) => b.APPROVE + b.HOLD + b.REJECT).map((b) => [lab(b.t), b.APPROVE, b.HOLD, b.REJECT, money(b.total)])) };
+}
+
+function mixChart(s, m) {
+  if (!s.processed) return emptyChart();
+  const cnt = { APPROVE: s.approved, HOLD: s.held, REJECT: s.rejected };
+  const totalMoney = OUT.reduce((x, [k]) => x + (m[k] || 0), 0) || 1;
+  const bar = (vals, fmt) => `<div class="stackbar" role="img">${OUT.filter(([k]) => vals[k]).map(([k, l, c]) => `<span style="flex:${vals[k]};background:${c}" data-ct="${esc(`${l}: ${fmt(vals[k])}`)}"></span>`).join("")}</div>`;
+  const chart = `<div class="mix">
+      <div class="mix-h"><span>Invoices</span><b>${s.processed}</b></div>${bar(cnt, (v) => `${v} · ${Math.round((100 * v) / s.processed)}%`)}
+      <div class="mix-h" style="margin-top:18px"><span>Money <span class="faint">(after reviews)</span></span><b>${kmoney(totalMoney)}</b></div>${bar(m, (v) => `${money(v)} · ${Math.round((100 * v) / totalMoney)}%`)}
+      <div class="mix-rows">${OUT.map(([k, l, c]) => `<div><span><i style="background:${c}"></i>${l}</span><b>${cnt[k]}</b><span class="faint">${Math.round((100 * cnt[k]) / s.processed)}%</span><span class="num">${kmoney(m[k] || 0)}</span></div>`).join("")}</div>
+    </div>`;
+  return { chart, table: tableHtml(["Result", "Invoices", "Share", "Money"], OUT.map(([k, l]) => [l, cnt[k], Math.round((100 * cnt[k]) / s.processed) + "%", money(m[k] || 0)])) };
+}
+
+function hbars(items, { fmt = (v) => v, color = () => "var(--c-bar)" } = {}) {
+  const max = Math.max(...items.map((i) => i.value), 0) || 1;
+  return `<div class="hbars">${items.map((it) => `<div class="hbar" data-ct="${esc(it.tip || `${esc(it.label)}: ${fmt(it.value)}`)}">
+      <div class="hbar-top"><span class="hbar-label">${esc(it.label)}</span><span class="hbar-val">${fmt(it.value)}</span></div>
+      <div class="hbar-track">${it.parts ? it.parts.filter((p) => p.v).map((p) => `<span style="width:${(100 * p.v) / max}%;background:${p.c}"></span>`).join("")
+        : `<span style="width:${Math.max(1.5, (100 * it.value) / max)}%;background:${color(it)}"></span>`}</div></div>`).join("")}</div>`;
+}
+
+function reasonsChart(reasons) {
+  if (!reasons.length) return emptyChart("No exceptions yet. Every invoice so far passed cleanly.");
+  const items = reasons.map((r) => ({ label: r.label, value: r.count, outcome: r.outcome, tip: `${esc(r.label)}: ${r.count}× · ${r.outcome === "reject" ? "rejects the invoice" : "sends it to a person"}` }));
+  return { legend: legendHtml([["Sends to a person", "var(--c-hold)"], ["Rejects", "var(--c-bad)"]]),
+    chart: hbars(items, { fmt: (v) => `${v}×`, color: (it) => (it.outcome === "reject" ? "var(--c-bad)" : "var(--c-hold)") }),
+    table: tableHtml(["Check", "Effect", "Times"], reasons.map((r) => [esc(r.label), r.outcome === "reject" ? "Rejects" : "To a person", r.count])) };
+}
+
+function teamsChart(teams) {
+  if (!teams.length) return emptyChart("Nothing has needed a person yet.");
+  const order = Object.values(QUEUE_KEYS);
+  const rows = teams.sort((a, b) => order.indexOf(a.team) - order.indexOf(b.team)).map((t) => ({ team: t.team, approved: t.approved || 0, pending: t.pending || 0, rejected: t.rejected || 0 }));
+  const items = rows.map((t) => ({ label: friendly(t.team), value: t.approved + t.pending + t.rejected,
+    tip: `${esc(friendly(t.team))}: ${t.pending} waiting · ${t.approved} approved · ${t.rejected} rejected`,
+    parts: [{ v: t.approved, c: "var(--c-ok)" }, { v: t.pending, c: "var(--c-hold)" }, { v: t.rejected, c: "var(--c-bad)" }] }));
+  return { legend: legendHtml([["Approved by reviewer", "var(--c-ok)"], ["Waiting", "var(--c-hold)"], ["Rejected by reviewer", "var(--c-bad)"]]),
+    chart: hbars(items),
+    table: tableHtml(["Team", "Waiting", "Approved", "Rejected"], rows.map((t) => [esc(friendly(t.team)), t.pending, t.approved, t.rejected])) };
+}
+
+function stagesChart(st) {
+  if (!st.length) return emptyChart();
+  const top = Math.max(...st.map((x) => x.avg_ms));
+  const items = st.map((x) => ({ label: STAGE_NAME[x.stage] || x.stage, value: x.avg_ms, hot: x.avg_ms === top, tip: `${esc(STAGE_NAME[x.stage] || x.stage)}: avg ${secs(x.avg_ms)} · slowest ${secs(x.max_ms)}` }));
+  return { chart: hbars(items, { fmt: (v) => secs(v), color: (it) => (it.hot ? "var(--accent)" : "var(--c-bar)") }) + `<p class="faint small chart-note">Slowest step highlighted. Reading the document is the only step that calls the AI.</p>`,
+    table: tableHtml(["Step", "Average", "Slowest"], st.map((x) => [STAGE_NAME[x.stage] || x.stage, secs(x.avg_ms), secs(x.max_ms)])) };
+}
+
+function vendorsChart(v) {
+  if (!v.length) return emptyChart("No approved spend yet.");
+  return { chart: hbars(v.map((x) => ({ label: x.vendor, value: x.total, tip: `${esc(x.vendor)}: ${money(x.total)} across ${x.count} invoice${x.count === 1 ? "" : "s"}` })), { fmt: kmoney }),
+    table: tableHtml(["Vendor", "Invoices", "Approved spend"], v.map((x) => [esc(x.vendor), x.count, money(x.total)])) };
+}
+
+function readersChart(r) {
+  const items = Object.entries(r).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: READER_NAME[k] || k, value: n, k }));
+  if (!items.length) return emptyChart();
+  const total = items.reduce((x, i) => x + i.value, 0);
+  return { chart: hbars(items, { fmt: (v) => `${v} · ${Math.round((100 * v) / total)}%`, color: (it) => (it.k === "gemini" ? "var(--accent)" : "var(--c-bar)") }) + `<p class="faint small chart-note">If the AI is unavailable, a basic reader takes over. If nothing can read it, a person does.</p>`,
+    table: tableHtml(["Reader", "Invoices"], items.map((i) => [i.label, i.value])) };
+}
+
+/* ---- chart tooltip: one floating element, driven by data-ct on any mark */
+const ctip = document.createElement("div");
+ctip.className = "ctip"; ctip.hidden = true; document.body.appendChild(ctip);
+const placeTip = (e) => {
+  const pad = 14, r = ctip.getBoundingClientRect();
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad;
+  ctip.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
+};
+document.addEventListener("mouseover", (e) => { const t = e.target.closest("[data-ct]"); if (!t) return; ctip.innerHTML = t.dataset.ct; ctip.hidden = false; placeTip(e); });
+document.addEventListener("mousemove", (e) => { if (!ctip.hidden) placeTip(e); });
+document.addEventListener("mouseout", (e) => { const t = e.target.closest("[data-ct]"); if (t && !t.contains(e.relatedTarget)) ctip.hidden = true; });
+document.addEventListener("scroll", () => (ctip.hidden = true), true);
+
 function exportCsv(runs) {
   const cols = [["Received", (r) => r.created_at], ["Vendor", (r) => r.vendor_name], ["Invoice #", (r) => r.invoice_number], ["PO", (r) => r.po_number], ["Amount", (r) => r.total],
     ["Currency", (r) => r.currency], ["Result", (r) => DEC_LABEL[outcome(r)] || ""], ["Next step", (r) => friendly(r.route_to)], ["Reason", (r) => r.headline], ["Seconds", (r) => (r.duration_ms || 0) / 1000], ["File", (r) => r.filename]];

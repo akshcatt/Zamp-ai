@@ -159,7 +159,7 @@ def _run(run_id: str, pdf: bytes, filename: str) -> None:
             elapsed = time.time() - t0
             if PACING_MS and elapsed * 1000 < PACING_MS:
                 time.sleep(PACING_MS / 1000 - elapsed)
-            out["duration_ms"] = int((time.time() - t0) * 1000)
+            out["duration_ms"] = int(elapsed * 1000)  # real work time; the demo pause above is not counted
             trace["stages"][key] = out
             _emit(run_id, "stage_end", key, label=label, **out)
             _persist_events(run_id, trace)

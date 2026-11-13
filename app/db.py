@@ -201,6 +201,18 @@ def open_runs_for_vendor(vendor_id: str, exclude: str) -> list[dict]:
              " AND (review_status IS NULL OR review_status = 'pending')", (vendor_id, exclude), fetch="all")
 
 
+def runs_for_analytics(limit: int = 5000) -> list[dict]:
+    rows = q("SELECT id, created_at, finished_at, decision, review_status, route_to, total, vendor_name, duration_ms,"
+             " extractor, trace_json FROM runs WHERE status != 'running' ORDER BY created_at, id LIMIT ?", (limit,), fetch="all")
+    for r in rows:
+        r["trace"] = json.loads(r.pop("trace_json") or "{}")
+    return rows
+
+
+def human_reviews() -> list[dict]:
+    return q("SELECT run_id, ts, actor, action FROM audit WHERE actor != 'system' ORDER BY id", fetch="all")
+
+
 def add_audit(run_id: str, actor: str, action: str, note: str = "") -> None:
     q("INSERT INTO audit (run_id, ts, actor, action, note) VALUES (?,?,?,?,?)", (run_id, now_iso(), actor, action, note))
 

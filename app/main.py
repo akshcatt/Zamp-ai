@@ -164,6 +164,60 @@ def stats():
     }
 
 
+STAGE_ORDER = [k for k, _ in pipeline.STAGES]
+
+
+@app.get("/api/analytics")
+def analytics():
+    """Everything the dashboard charts need, computed from the stored run traces."""
+    from collections import Counter, defaultdict
+    from datetime import datetime
+
+    rs = db.runs_for_analytics()
+    final = lambda r: ("APPROVE" if r["review_status"] == "approved" else "REJECT" if r["review_status"] == "rejected"
+                       else r["decision"]) if r["decision"] == "HOLD" else r["decision"]
+    timeline, stage_ms, reasons, teams, vendors, readers = [], defaultdict(list), Counter(), defaultdict(Counter), defaultdict(lambda: [0, 0.0]), Counter()
+    money = Counter()
+    for r in rs:
+        tr, total = r["trace"], r["total"] or 0
+        protected = (r["decision"] == "REJECT" and (r["route_to"] or "").startswith("Rejected: duplicate")) or \
+                    (r["decision"] == "HOLD" and r["route_to"] == "Treasury & Fraud")
+        timeline.append({"t": r["created_at"], "decision": r["decision"], "final": final(r), "total": total,
+                         "protected": total if protected else 0, "ms": r["duration_ms"] or 0})
+        for k, st in (tr.get("stages") or {}).items():
+            if st.get("duration_ms") is not None:
+                stage_ms[k].append(st["duration_ms"])
+            for c in st.get("checks") or []:
+                if c.get("status") in ("fail", "warn") and c.get("outcome"):
+                    reasons[(c["label"], c["outcome"])] += 1
+        if r["decision"] == "HOLD":
+            teams[r["route_to"]][r["review_status"] or "pending"] += 1
+        money[final(r)] += total
+        if final(r) == "APPROVE" and r["vendor_name"]:
+            vendors[r["vendor_name"]][0] += 1
+            vendors[r["vendor_name"]][1] += total
+        readers[r["extractor"] or "none"] += 1
+    created = {r["id"]: r["created_at"] for r in rs}
+    turnaround = []
+    for a in db.human_reviews():
+        if a["run_id"] in created:
+            try:
+                dt = datetime.fromisoformat(a["ts"]) - datetime.fromisoformat(created[a["run_id"]])
+                turnaround.append(dt.total_seconds())
+            except ValueError:
+                pass
+    return {
+        "timeline": timeline,
+        "stage_ms": [{"stage": k, "avg_ms": round(sum(v) / len(v)), "max_ms": max(v)} for k in STAGE_ORDER if (v := stage_ms.get(k))],
+        "reasons": [{"label": l, "outcome": o, "count": n} for (l, o), n in reasons.most_common(8)],
+        "teams": [{"team": t, **dict(c)} for t, c in teams.items()],
+        "money": {k: round(money.get(k, 0), 2) for k in ("APPROVE", "HOLD", "REJECT")},
+        "vendors": sorted(({"vendor": v, "count": c, "total": round(s, 2)} for v, (c, s) in vendors.items()), key=lambda x: -x["total"])[:6],
+        "readers": dict(readers),
+        "reviews": {"count": len(turnaround), "avg_seconds": round(sum(turnaround) / len(turnaround)) if turnaround else None},
+    }
+
+
 @app.get("/api/reference")
 def reference():
     m = db.master()

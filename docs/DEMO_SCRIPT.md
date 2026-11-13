@@ -51,7 +51,7 @@ Target 4:45. Speak to a non-technical AP manager, not to an engineer.
   > "…it's caught. The same normalisation catches reformatted numbers like 'INV 2026/0417' versus 'INV-2026-0417'."
 
 **4:15–4:45 · Overview & close** (Overview → Needs review → open the Keystone invoice → pick a quick note or type one → Reject)
-> "The overview shows how much ran with no one touching it, what's waiting and with which team and how close it is to its deadline, the money protected, and the time saved. You can search, filter and export to a spreadsheet. Humans only see exceptions, routed to the team that owns them, and every action needs a note that goes into the audit trail. Rules and tolerances are editable here, in plain language. That's ClearAP."
+> "The overview shows how much ran with no one touching it, what's waiting and with which team and how close it is to its deadline, the money protected, and the time saved. The charts show what came in over time, why invoices were stopped, which team is reviewing what, and where the time goes; any chart flips to a table. You can search, filter and export to a spreadsheet. Humans only see exceptions, routed to the team that owns them, and every action needs a note that goes into the audit trail. Rules and tolerances are editable here, in plain language. That's ClearAP."
 
 ## C. Live interview runbook (longer version, ~10 min)
 
