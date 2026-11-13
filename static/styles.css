@@ -692,3 +692,20 @@ code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2)
 .vc-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
 .vc-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--surface); color: var(--warn); box-shadow: 0 0 0 1px var(--warn-line); flex: none; }
 .vc-ic svg { width: 18px; height: 18px; }
+/* verify-and-fix strip inside the decision banner */
+.fixbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 6px; padding: 12px 14px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--warn-line); box-shadow: 0 0 0 3px var(--warn-soft); }
+.fixbar .fb-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--warn-soft); color: var(--warn); flex: none; }
+.fixbar .fb-ic svg { width: 17px; height: 17px; }
+.fixbar .fb-t { flex: 1; min-width: 200px; font-size: 14px; }
+.fixbar.busy { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fixbar.done { border-color: var(--ok-line); box-shadow: 0 0 0 3px var(--ok-soft); }
+.fixbar.done .fb-ic { background: var(--ok-soft); color: var(--ok); }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--accent-soft); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.fixed-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px; font-size: 14px;
+  background: var(--surface-2); border: 1px solid var(--line); }
+.fixed-note svg { width: 18px; height: 18px; flex: none; }
+.fixed-note span { flex: 1; min-width: 200px; }
+.fixed-note.ok { background: var(--ok-soft); border-color: var(--ok-line); } .fixed-note.ok svg { color: var(--ok); }
+.fixed-note.partial { background: var(--warn-soft); border-color: var(--warn-line); } .fixed-note.partial svg { color: var(--warn); }

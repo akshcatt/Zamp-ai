@@ -313,3 +313,14 @@ def test_small_difference_is_the_smaller_of_10_rupees_and_2_percent(env):
     assert pl.small(P, 50000) == 10.0    # big amount: ₹10 is smaller than 2% (₹1,000)
     assert pl.small(P, 200) == 4.0       # small amount: 2% (₹4) is smaller than ₹10
     assert pl.small(P, 500) == 10.0      # the crossover
+
+
+def test_missing_bank_details_are_not_an_issue(env, monkeypatch):
+    """No bank details printed (and the reader unsure about that empty field): approved, payment goes to the account on file."""
+    def no_bank(t):
+        t["bank_details"] = {"bank_name": None, "ifsc": None, "account_number": None, "iban": None, "swift": None}
+        t["field_confidence"]["bank_details"] = 0.2
+    r = _truth_run(env, monkeypatch, "happy_path", no_bank)
+    assert r["decision"] == "APPROVE", r["headline"]
+    assert _check(r, "val.confidence")["status"] == "pass"
+    assert "That's fine" in _check(r, "ven.bank")["detail"]

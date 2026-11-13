@@ -599,8 +599,10 @@ def st_validate(ctx):
 
     # extraction confidence on critical fields
     conf = inv.get("field_confidence") or {}
+    b = inv.get("bank_details") or {}
+    has_bank = bool(b.get("account_number") or b.get("ifsc"))  # no bank details printed is fine: we only pay the account on file
     low = {k: v for k, v in conf.items() if isinstance(v, (int, float)) and v < P["min_field_confidence"]
-           and k in ("invoice_number", "total_amount", "vendor_name", "bank_details", "line_items")}
+           and k in ("invoice_number", "total_amount", "vendor_name", "line_items") + (("bank_details",) if has_bank else ())}
     if low:
         checks.append(chk("val.confidence", "Extraction confidence", "fail",
                           "Low confidence on " + ", ".join(f"{k} ({v:.2f})" for k, v in low.items()) + ". A human must verify against the image.",
@@ -723,7 +725,10 @@ def st_vendor(ctx):
                               f"on file: {mb['bank_name']} ••••{mb['account_number'][-4:]}",
                               "hold", "fraud", evidence={"invoice": bank, "master_last4": mb["account_number"][-4:]}))
     else:
-        checks.append(chk("ven.bank", "Remit-to bank matches vendor record", "info", "No remit details on the invoice (or none on file yet). Payment only ever goes to the verified account on file."))
+        checks.append(chk("ven.bank", "Remit-to bank matches vendor record", "info",
+                          "No bank details on the invoice. That's fine: payment only ever goes to the verified account on file."
+                          if not (bank.get("account_number") or bank.get("ifsc")) else
+                          "No bank account on file for this vendor yet, so there's nothing to compare. Vendor Management confirms it when verifying."))
 
     note = inv.get("payment_instruction_notes") or ""
     if re.search(r"(new|changed?|update[ds]?)\s+(bank|account|banking|remit)|changed banks", note, re.I):
@@ -1125,7 +1130,8 @@ def _payment_plan(inv, vendor, po, ctx) -> dict:
     d = iso(inv.get("invoice_date")) or TODAY()
     due = d + timedelta(days=terms["net_days"])
     plan = {"terms": inv.get("payment_terms") or vendor.get("payment_terms"), "due_date": due.isoformat(), "pay_on": due.isoformat(),
-            "pay_to": f"{vendor['bank']['bank_name']} ••••{vendor['bank']['account_number'][-4:]} (verified account on file)",
+            "pay_to": (f"{vendor['bank']['bank_name'] or 'Bank'} ••••{vendor['bank']['account_number'][-4:]} (verified account on file)"
+                       if vendor.get("bank", {}).get("account_number") else "The vendor's verified bank account (to be confirmed by Vendor Management before release)"),
             "amount": inv.get("total_amount")}
     if terms["discount_pct"]:
         disc_by = d + timedelta(days=terms["discount_days"])

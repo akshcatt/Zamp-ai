@@ -340,7 +340,7 @@ def stats():
     }
 
 
-REVIEW_ACTIONS = ("approved_override", "rejected", "corrected")
+REVIEW_ACTIONS = ("approved_override", "rejected", "corrected", "rechecked")  # verifying a vendor re-checks: a decision too
 
 
 def momentum(rs: list[dict]) -> dict:

@@ -64,7 +64,9 @@ const TOAST_ICON = {
 };
 const TOAST_TITLE = { ok: "Done", error: "Couldn't do that", info: "Working on it", win: "Nice work" };
 // Stacked toasts: kind = ok | error | info | win. Errors stay longer; every toast can be dismissed.
+let lastWin = 0;
 function toast(msg, kind = "ok") {
+  if (kind === "win") lastWin = Date.now();
   const box = $("#toasts");
   const t = document.createElement("div");
   const ms = kind === "error" ? 6000 : kind === "win" ? 5000 : 3400;
@@ -108,6 +110,7 @@ const icon = {
   moon: `<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>`,
   edit: `<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>`,
   user: `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>`,
+  check: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>`,
   archive: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>`,
   alert: `<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>`,
   spark: `<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>`,
@@ -257,12 +260,12 @@ function paintMomentum(s) {
       <div style="min-width:0"><b>${pend ? `${pend} to clear` : s.processed ? "Queue zero" : "No invoices yet"}</b><div class="faint small">${today} decided today${s.streak_days > 1 ? ` · 🔥 ${s.streak_days}-day streak` : ""}</div></div></div>
     <a class="mo-wins" href="#/" title="Milestones on the Overview"><span>Milestones</span><span class="mono">${won.length}/${ms.length}</span><i style="width:${(100 * won.length) / ms.length}%"></i></a>`;
   // celebrate real progress, once
-  if (chrome.pending > 0 && pend === 0) { toast("Queue zero. Every invoice has a decision.", "win"); el.classList.add("celebrate"); setTimeout(() => el.classList.remove("celebrate"), 1400); }
+  if (chrome.pending > 0 && pend === 0) { if (Date.now() - lastWin > 4000) toast("Queue zero. Every invoice has a decision.", "win"); el.classList.add("celebrate"); setTimeout(() => el.classList.remove("celebrate"), 1400); }
   chrome.pending = pend;
   const seen = new Set(store.get("clearap-wins").split(",").filter(Boolean));
   const fresh = won.filter((m) => !seen.has(m.k));
   if (fresh.length) {
-    if (store.get("clearap-wins-init")) fresh.slice(0, 2).forEach((m) => toast(`Milestone unlocked: ${m.name}`, "win"));
+    if (store.get("clearap-wins-init")) toast(`Milestone${fresh.length > 1 ? "s" : ""} unlocked: ${fresh.map((m) => m.name).join(", ")}`, "win");
     store.set("clearap-wins", [...seen, ...fresh.map((m) => m.k)].join(","));
   }
   store.set("clearap-wins-init", "1");
@@ -780,12 +783,16 @@ function renderDecision(st) {
   if (st.error) { el.innerHTML = `<div class="decision HOLD"><div class="verdict"><span class="word">Error</span></div><div class="headline">${esc(st.error)}</div><p class="plain">Nothing was paid. The invoice was safely passed to the accounts payable team to handle by hand.</p></div>`; return; }
   if (!d) { el.innerHTML = `<div class="decision"><div class="verdict"><span class="badge running">Checking</span><span class="muted">The decision appears here once every step is done…</span></div></div>`; return; }
   const p = d.payment, c = d.check_counts;
-  el.innerHTML = `<div class="decision ${d.decision} fade">
+  const canVerify = vendorToVerify(st);
+  const fixedNote = st.run.review_status === "corrected" ? `<div class="fixed-note" id="fixed-note">${icon.check}<span>This issue was resolved and the invoice re-checked. Loading the new result…</span></div>` : "";
+  el.innerHTML = fixedNote + `<div class="decision ${d.decision} fade">
     <div class="verdict"><span class="word">${DEC_LABEL[d.decision]}</span><span class="route">${esc(friendly(d.route_name))}</span>
       ${d.sla ? `<span class="sla">· answer within ${esc(d.sla.toLowerCase())}</span>` : ""}
       ${d.money_protected ? `<span class="protected">${icon.shield} ${money(d.money_protected)} protected</span>` : ""}
       ${(d.also_notify || []).length ? `<span class="sla">· also telling ${d.also_notify.map((n) => esc(friendly(n))).join(", ")}</span>` : ""}</div>
     <div class="headline">${esc(d.headline)}</div>
+    ${canVerify ? `<div class="fixbar" id="fixbar"><span class="fb-ic">${icon.shield}</span><div class="fb-t"><b>Fix it here:</b> verify this vendor once. The invoice is then re-checked automatically.</div>
+      <button class="btn ok sm" onclick="verifyHere()">${icon.shield} Verify vendor &amp; re-check</button><button class="btn ghost sm" onclick="blockVendor(vendorToVerify(_st), () => router())">Block</button></div>` : ""}
     <p class="plain">${esc(plainSentence(d))}</p>
     <div class="tally"><span class="p">${c.pass} OK</span><span class="w">${c.warn} heads-up</span><span class="f">${c.fail} problem${c.fail === 1 ? "" : "s"}</span><span>${c.info + c.skip} FYI / skipped</span></div>
     <div class="cols">
@@ -798,9 +805,59 @@ function renderDecision(st) {
         <dt>To</dt><dd>${esc(p.pay_to)}</dd><dt>Terms</dt><dd>${esc(p.terms)} · due ${esc(p.due_date)}</dd>
         <dt>Booked to ${tip("The accounting categories (general ledger accounts) this spend is recorded under.")}</dt><dd>${p.gl_coding.map((g) => `${esc(g.account)}: ${money(g.amount)}`).join(" · ")}${p.cost_center ? ` · ${esc(p.cost_center)}` : ""}</dd></dl></div>` : ""}
     ${d.internal_task ? `<div class="sect"><h3>Task for our team (don't reply to the sender)</h3><div class="task">${esc(d.internal_task)}</div></div>` : ""}
-    ${d.vendor_email ? `<div class="sect"><h3 style="display:flex;align-items:center;gap:10px">Email to the vendor, ready to send <button class="btn sm" onclick="navigator.clipboard.writeText(_st.decision.vendor_email.body);toast('Email copied')">Copy</button></h3>
+    ${d.vendor_email && !canVerify ? `<div class="sect"><h3 style="display:flex;align-items:center;gap:10px">Email to the vendor, ready to send <button class="btn sm" onclick="navigator.clipboard.writeText(_st.decision.vendor_email.body);toast('Email copied')">Copy</button></h3>
       <div class="email"><div class="hdr"><b>To:</b> ${esc(d.vendor_email.to)}<br><b>Subject:</b> ${esc(d.vendor_email.subject)}</div>${esc(d.vendor_email.body)}</div></div>` : ""}
   </div>`;
+  if (fixedNote) showFixedResult(st);
+}
+
+/* ---- verify a new vendor right where the problem is shown, then confirm the fix automatically */
+function vendorToVerify(st) {
+  const r = st?.run;
+  return r && r.decision === "HOLD" && (!r.review_status || r.review_status === "pending") ? st.decision?.vendor_to_verify || null : null;
+}
+const latestVersionOf = (run) => ((run.audit || []).map((a) => (a.note || "").match(/re-checked as (R[\w-]+)/)).find(Boolean) || [])[1];
+async function waitForRun(id, ms = 45000) {
+  const t0 = Date.now();
+  for (;;) {
+    const r = await api(`/api/runs/${id}`);
+    if (r.status !== "running" || Date.now() - t0 > ms) return r;
+    await new Promise((res) => setTimeout(res, 700));
+  }
+}
+function resultLine(r) {
+  return r.decision === "APPROVE" ? `<b>Fixed.</b> Re-checked and <b>approved</b>: ${money(r.total)} scheduled for payment.`
+    : r.decision === "HOLD" ? `<b>Vendor issue fixed.</b> Re-checked, but it still needs a look for another reason: ${esc(r.headline)}`
+    : `Re-checked: ${esc(DEC_LABEL[r.decision] || r.decision)}. ${esc(r.headline)}`;
+}
+async function verifyHere() {
+  const st = window._st, vid = vendorToVerify(st);
+  if (!vid) return;
+  if (!(await ask({ title: "Verify this vendor?", ok: "Verify & re-check", icon: icon.shield,
+    body: "Do this after checking their GSTIN on the GST portal and confirming the bank account. Their details then become the reference, and this invoice is re-checked against every rule straight away." }))) return;
+  const bar = $("#fixbar");
+  const say = (html, cls = "") => { if (bar) { bar.className = "fixbar " + cls; bar.innerHTML = html; } };
+  try {
+    say(`<span class="spin"></span><div class="fb-t"><b>Vendor verified.</b> Re-checking this invoice against every rule…</div>`, "busy");
+    await postJSON(`/api/vendors/${vid}/verify`, { actor: reviewer() });
+    const next = latestVersionOf(await api(`/api/runs/${st.run.id}`));
+    if (!next) { say(`<div class="fb-t"><b>Vendor verified.</b> Nothing was waiting to re-check.</div>`, "done"); refreshChrome(); return; }
+    const r = await waitForRun(next);
+    const ok = r.decision === "APPROVE";
+    say(`<span class="fb-ic">${ok ? icon.check : icon.alert}</span><div class="fb-t">${resultLine(r)}</div><a class="btn sm ${ok ? "ok" : ""}" href="#/runs/${r.id}">Open the re-checked invoice →</a>`, ok ? "done" : "partial");
+    toast(ok ? "Issue fixed: vendor verified and the invoice approved" : "Vendor verified. The invoice still needs a look for another reason.", ok ? "win" : "info");
+    refreshChrome();
+    if (ok) setTimeout(() => { if (location.hash.includes(st.run.id)) location.hash = `#/runs/${r.id}`; }, 2500);
+  } catch (e) { say(`<div class="fb-t">${esc(e.message)}</div>`, "partial"); toast(e.message, "error"); }
+}
+async function showFixedResult(st) {
+  const next = latestVersionOf(st.run), el = $("#fixed-note");
+  if (!next || !el) return;
+  try {
+    const r = await waitForRun(next, 20000);
+    el.className = "fixed-note " + (r.decision === "APPROVE" ? "ok" : "partial");
+    el.innerHTML = `${r.decision === "APPROVE" ? icon.check : icon.alert}<span>${resultLine(r)}</span><a class="btn sm" href="#/runs/${r.id}">Open →</a>`;
+  } catch {}
 }
 
 function renderDetail(st) {
@@ -829,7 +886,8 @@ const stageDataLabel = (k) => ({ extract: "What the AI read", po_match: "Line by
 const checksHtml = (cs) => cs.length ? `<div class="checks">${cs.map((c) => `<div class="check ${c.status}">
   <div><span class="badge ${c.status}">${STATUS_LABEL[c.status]}</span></div>
   <div style="min-width:0"><div class="lbl">${esc(c.label)}</div><div class="det">${esc(c.detail)}</div>
-  ${c.outcome ? `<div class="route-tag">→ ${c.outcome === "reject" ? "rejects the invoice" : `sends it to the ${esc(friendly(QUEUE_KEYS[c.route] || "AP Specialist").toLowerCase())}`}</div>` : ""}</div></div>`).join("")}</div>` : "";
+  ${c.outcome ? `<div class="route-tag">→ ${c.outcome === "reject" ? "rejects the invoice" : `sends it to the ${esc(friendly(QUEUE_KEYS[c.route] || "AP Specialist").toLowerCase())}`}</div>` : ""}
+  ${c.status === "fail" && /^ven\.(match|status)$/.test(c.id || "") && vendorToVerify(window._st) ? `<button class="btn ok sm" style="margin-top:10px" onclick="verifyHere()">${icon.shield} Verify vendor &amp; re-check</button>` : ""}</div></div>`).join("")}</div>` : "";
 
 const FIELD_LIST = [["vendor_name", "Vendor"], ["invoice_number", "Invoice #"], ["invoice_date", "Invoice date"], ["due_date", "Due date"], ["po_reference", "Order (PO) #"], ["payment_terms", "Payment terms"],
   ["currency", "Currency"], ["bill_to_name", "Billed to"], ["vendor_email", "Sender email"], ["vendor_tax_id", "GSTIN"], ["subtotal", "Subtotal", 1], ["discount_amount", "Discount", 1], ["tax_amount", "GST", 1], ["shipping_amount", "Shipping", 1], ["round_off", "Round off", 1], ["total_amount", "Total", 1]];
@@ -928,17 +986,7 @@ function renderReview(st) {
         <dt>GSTIN</dt><dd class="mono">${esc(v.tax_id || "Not printed on the invoice")}</dd><dt>Bank</dt><dd>${esc(v.bank)}${v.ifsc ? ` · IFSC <span class="mono">${esc(v.ifsc)}</span>` : ""}</dd>
         <dt>Email domain</dt><dd class="mono">${esc(v.email_domain || "—")}</dd><dt>Added</dt><dd>${when(v.created_at)} from this invoice</dd>`;
     }).catch(() => {});
-    $("#vv-ok").onclick = async () => {
-      if (!(await ask({ title: "Verify this vendor?", ok: "Verify & re-check", icon: icon.shield,
-        body: "Their GSTIN and bank account become the reference for every future invoice, and any of their invoices waiting here are re-checked against every rule." }))) return;
-      try {
-        const out = await postJSON(`/api/vendors/${vv}/verify`, { actor: reviewer() });
-        toast(`Vendor verified. Re-checking ${out.rechecked.length} invoice${out.rechecked.length === 1 ? "" : "s"}…`);
-        const again = await api(`/api/runs/${r.id}`);
-        const next = ((again.audit || []).map((a) => (a.note || "").match(/re-checked as (R[\w-]+)/)).find(Boolean) || [])[1];
-        refreshChrome(); if (next) location.hash = `#/runs/${next}`; else router();
-      } catch (e) { toast(e.message, "error"); }
-    };
+    $("#vv-ok").onclick = () => { window.scrollTo({ top: 0, behavior: "smooth" }); verifyHere(); };
     $("#vv-block").onclick = () => blockVendor(vv, () => router());
   }
   $("#restore") && ($("#restore").onclick = async () => { try { st.run = await postJSON(`/api/runs/${r.id}/restore`, { actor: reviewer() }); toast("Restored"); renderReview(st); } catch (e) { toast(e.message, "error"); } });
