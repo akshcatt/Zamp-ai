@@ -140,11 +140,9 @@ def test_vendor_profiles_and_exports(monkeypatch):
     run_sample(c, "happy_path")
     run_sample(c, "edge_bank_change_fraud")
     v = c.get("/api/vendors").json()
-    assert len(v["vendors"]) == 8
+    assert len(v["vendors"]) == 7 and all(x["source"] == "payment history" for x in v["vendors"])  # learned, no master file
     keystone = next(x for x in v["vendors"] if x["name"].startswith("Kesari"))
     assert keystone["waiting"] == 1 and "Bank-change attempt seen" in keystone["flags"]
-    blocked = next(x for x in v["vendors"] if x["status"] != "active")
-    assert "Blocked in vendor master" in blocked["flags"]
     wb = load_workbook(io.BytesIO(c.get("/api/export.xlsx").content))
     assert wb.sheetnames == ["Summary", "Invoices", "Exceptions", "Ledger"]
     assert wb["Invoices"].max_row == 3 and wb["Exceptions"].max_row >= 2
@@ -253,3 +251,34 @@ def test_autoload_replays_samples_from_stored_reads(monkeypatch):
     assert by_file == {"01": "APPROVE", "02": "HOLD", "03": "APPROVE", "04": "REJECT", "05": "HOLD",
                        "06": "APPROVE", "07": "REJECT", "08": "APPROVE", "09": "NOT_INVOICE"}
     assert demo.autoload_samples(wait=True) == 0  # never touches a database that already has data
+
+
+
+def test_new_vendor_is_learned_then_verified_once(monkeypatch):
+    """No vendor master: an unknown vendor is added from its first invoice, held once, and re-checked after verification."""
+    c, db, pl = make_client(monkeypatch)
+    db.q("DELETE FROM vendors WHERE legal_name LIKE 'Sahyadri%'")  # we have never dealt with them
+    r = run_sample(c, "happy_path")
+    assert r["decision"] == "HOLD" and r["route_to"] == "Vendor Management" and "new vendor" in r["headline"]
+    new = next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Sahyadri"))
+    assert new["status"] == "unverified" and new["source"] == "first invoice" and new["first_run_id"] == r["id"]
+    assert new["ifsc"] == "HDFC0000523" and new["bank"].endswith("5417")  # reference details taken from the invoice
+    assert "New vendor: needs verification" in new["flags"]
+    out = c.post(f"/api/vendors/{new['vendor_id']}/verify", json={"actor": "Priya"}).json()
+    assert out["vendor"]["status"] == "active" and out["vendor"]["verified_by"] == "Priya" and len(out["rechecked"]) == 1
+    again = wait(c, out["rechecked"][0])
+    assert again["decision"] == "APPROVE", again["headline"]
+    assert c.get(f"/api/runs/{r['id']}").json()["review_status"] == "corrected"  # original superseded, not a duplicate
+    # the next invoice from them is matched to the learned record, no second verification
+    assert run_sample(c, "variant_phone_photo")["route_to"] != "Vendor Management"
+
+
+def test_block_and_unblock_vendor(monkeypatch):
+    c, db, pl = make_client(monkeypatch)
+    pragati = next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Pragati"))
+    assert c.post(f"/api/vendors/{pragati['vendor_id']}/block", json={"reason": ""}).status_code == 400
+    assert c.post(f"/api/vendors/{pragati['vendor_id']}/block", json={"reason": "GST registration cancelled"}).json()["vendor"]["status"] == "blocked"
+    r = run_sample(c, "variant_within_tolerance")
+    assert r["decision"] == "REJECT" and r["route_to"] == "Rejected: blocked vendor"
+    c.post(f"/api/vendors/{pragati['vendor_id']}/unblock", json={})
+    assert next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Pragati"))["status"] == "active"

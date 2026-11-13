@@ -130,7 +130,7 @@ const TEAM_WHY = {
   "Treasury & Fraud": "Bank details changed or look suspicious. They phone the vendor on a known number before any money moves.",
   "Controller approval": "Large amounts need a manager's sign-off even when everything matches.",
   "Procurement / Buyer": "The invoice doesn't line up with the purchase order. The person who placed the order confirms it.",
-  "Vendor Management": "We don't recognise the vendor. They set it up properly first.",
+  "Vendor Management": "A new vendor, learned from this invoice. Verify them once (GSTIN + bank) and every later invoice from them flows straight through.",
   "AP Specialist": "The document was hard to read or data is unclear. A person types in or confirms the details.",
 };
 const SLA_HOURS = { "Treasury & Fraud": 8, "Controller approval": 24, "Procurement / Buyer": 48, "Vendor Management": 48, "AP Specialist": 24 };
@@ -832,7 +832,7 @@ const checksHtml = (cs) => cs.length ? `<div class="checks">${cs.map((c) => `<di
   ${c.outcome ? `<div class="route-tag">→ ${c.outcome === "reject" ? "rejects the invoice" : `sends it to the ${esc(friendly(QUEUE_KEYS[c.route] || "AP Specialist").toLowerCase())}`}</div>` : ""}</div></div>`).join("")}</div>` : "";
 
 const FIELD_LIST = [["vendor_name", "Vendor"], ["invoice_number", "Invoice #"], ["invoice_date", "Invoice date"], ["due_date", "Due date"], ["po_reference", "Order (PO) #"], ["payment_terms", "Payment terms"],
-  ["currency", "Currency"], ["bill_to_name", "Billed to"], ["vendor_email", "Sender email"], ["vendor_tax_id", "Tax ID"], ["subtotal", "Subtotal", 1], ["tax_amount", "Tax", 1], ["shipping_amount", "Shipping", 1], ["total_amount", "Total", 1]];
+  ["currency", "Currency"], ["bill_to_name", "Billed to"], ["vendor_email", "Sender email"], ["vendor_tax_id", "GSTIN"], ["subtotal", "Subtotal", 1], ["discount_amount", "Discount", 1], ["tax_amount", "GST", 1], ["shipping_amount", "Shipping", 1], ["round_off", "Round off", 1], ["total_amount", "Total", 1]];
 function fieldsHtml(f, conf, list = FIELD_LIST) {
   return `<div class="fields">${list.map(([k, l, isM]) => { const v = f[k], c = conf[k], low = c != null && c < 0.7;
     return `<div class="field ${low ? "low" : ""}"><div class="k"><span>${l}</span>${c != null ? `<span title="How sure the AI is">${Math.round(c * 100)}%</span>` : ""}</div><div class="v ${v == null ? "null" : ""}">${v == null ? "not on the invoice" : esc(isM ? money(v) : v)}</div>
@@ -896,15 +896,21 @@ const QUICK_NOTES = {
 function renderReview(st) {
   const el = $("#review"), r = st.run;
   const replacedBy = r.review_status === "corrected" && ((r.audit || []).map((a) => (a.note || "").match(/re-checked as (R[\w-]+)/)).find(Boolean) || [])[1];
-  const fromRun = (r.source || "").match(/re-keyed from (R[\w-]+)/)?.[1];
-  const links = replacedBy ? `<div class="notice">This invoice was corrected by a reviewer and re-checked. <a href="#/runs/${replacedBy}">Open the corrected version →</a></div>`
-    : fromRun ? `<div class="notice">These details were typed in by a reviewer from the document. <a href="#/runs/${fromRun}">See the original attempt →</a></div>` : "";
+  const fromRun = (r.source || "").match(/re-(?:keyed|checked) from (R[\w-]+)/)?.[1];
+  const links = replacedBy ? `<div class="notice">This invoice was re-checked (corrected details or a newly verified vendor). <a href="#/runs/${replacedBy}">Open the latest version →</a></div>`
+    : fromRun ? `<div class="notice">${/re-checked/.test(r.source) ? "Re-checked after the vendor was verified." : "These details were typed in by a reviewer from the document."} <a href="#/runs/${fromRun}">See the original attempt →</a></div>` : "";
   const audit = (r.audit || []).length ? `<div class="card pad" style="margin-top:16px"><h3>History</h3><ul class="audit">${r.audit.map((a) => `<li><span class="mono faint">${when(a.ts)}</span> · <b>${esc(a.actor)}</b> · ${esc(a.action.replace(/_/g, " "))}${a.note ? `: ${esc(a.note)}` : ""}</li>`).join("")}</ul></div>` : "";
   const pending = r.decision === "HOLD" && (!r.review_status || r.review_status === "pending");
   const misfiled = r.decision === "NOT_INVOICE" && !r.review_status;
   const archived = r.archived_at ? `<div class="notice">Archived ${when(r.archived_at)}. It's off the working list but kept for audit, and it still counts when checking for repeat invoices. <button class="linkish" id="restore">Restore it</button></div>` : "";
   const notes = QUICK_NOTES[r.route_to] || [];
-  el.innerHTML = archived + links + (misfiled ? `<div class="card pad" style="margin-top:16px"><h3>Is this actually an invoice?</h3>
+  const vv = pending && r.trace?.decision?.vendor_to_verify;
+  const verifyCard = vv ? `<div class="card pad verify-card" style="margin-top:16px"><div class="vc-head"><span class="vc-ic">${icon.shield}</span>
+      <div><h3 style="margin:0">New vendor · verify once</h3><div class="muted small">NoCap has no vendor master. It learned this vendor from the invoice; check them once and they're trusted from then on.</div></div></div>
+      <dl class="kv small" id="vv-details"><dt>Vendor</dt><dd>Loading…</dd></dl>
+      <ul class="m-list small muted"><li>Look up the GSTIN on the GST portal: is it active, and does the legal name match?</li><li>Confirm the bank account with a cancelled cheque or a call to a contact you already know.</li></ul>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn ok" id="vv-ok">${icon.shield} Verify vendor &amp; re-check</button><button class="btn bad" id="vv-block">Block vendor</button></div></div>` : "";
+  el.innerHTML = archived + links + verifyCard + (misfiled ? `<div class="card pad" style="margin-top:16px"><h3>Is this actually an invoice?</h3>
       <p class="muted small" style="margin:0 0 12px">If the vendor is really asking to be paid, type the details from the document. It will be re-checked against every rule, like any invoice.</p>
       <button class="btn" id="fix">${icon.edit} Correct details &amp; re-check</button></div><div id="fix-form"></div>` : "") + (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
       <p class="muted small" style="margin:0 0 10px">${esc(TEAM_WHY[r.route_to] || "")}</p>
@@ -915,6 +921,26 @@ function renderReview(st) {
         <span class="faint small" style="margin-left:auto">Recorded as <b>${esc(reviewer() || "AP Reviewer")}</b></span></div></div></div>
       <div id="fix-form"></div>` : "") + audit;
   if (misfiled) $("#fix").onclick = () => renderFixForm(st);
+  if (vv) {
+    api("/api/vendors").then(({ vendors }) => {
+      const v = vendors.find((x) => x.vendor_id === vv); if (!v || !$("#vv-details")) return;
+      $("#vv-details").innerHTML = `<dt>Vendor</dt><dd><b>${esc(v.name)}</b> <span class="faint mono">${esc(v.vendor_id)}</span></dd>
+        <dt>GSTIN</dt><dd class="mono">${esc(v.tax_id || "Not printed on the invoice")}</dd><dt>Bank</dt><dd>${esc(v.bank)}${v.ifsc ? ` · IFSC <span class="mono">${esc(v.ifsc)}</span>` : ""}</dd>
+        <dt>Email domain</dt><dd class="mono">${esc(v.email_domain || "—")}</dd><dt>Added</dt><dd>${when(v.created_at)} from this invoice</dd>`;
+    }).catch(() => {});
+    $("#vv-ok").onclick = async () => {
+      if (!(await ask({ title: "Verify this vendor?", ok: "Verify & re-check", icon: icon.shield,
+        body: "Their GSTIN and bank account become the reference for every future invoice, and any of their invoices waiting here are re-checked against every rule." }))) return;
+      try {
+        const out = await postJSON(`/api/vendors/${vv}/verify`, { actor: reviewer() });
+        toast(`Vendor verified. Re-checking ${out.rechecked.length} invoice${out.rechecked.length === 1 ? "" : "s"}…`);
+        const again = await api(`/api/runs/${r.id}`);
+        const next = ((again.audit || []).map((a) => (a.note || "").match(/re-checked as (R[\w-]+)/)).find(Boolean) || [])[1];
+        refreshChrome(); if (next) location.hash = `#/runs/${next}`; else router();
+      } catch (e) { toast(e.message, "error"); }
+    };
+    $("#vv-block").onclick = () => blockVendor(vv, () => router());
+  }
   $("#restore") && ($("#restore").onclick = async () => { try { st.run = await postJSON(`/api/runs/${r.id}/restore`, { actor: reviewer() }); toast("Restored"); renderReview(st); } catch (e) { toast(e.message, "error"); } });
   if (pending) {
     $$(".quick button", el).forEach((b) => (b.onclick = () => { $("#note").value = b.dataset.n; $("#note").focus(); }));
@@ -926,6 +952,13 @@ function renderReview(st) {
     $("#ap").onclick = () => act("approve"); $("#rj").onclick = () => act("reject");
     $("#fix").onclick = () => renderFixForm(st);
   }
+}
+
+async function blockVendor(id, after) {
+  const reason = await ask({ title: "Block this vendor?", danger: true, ok: "Block vendor", icon: icon.alert,
+    body: "Every invoice from them will be rejected until someone unblocks them. The reason is recorded.", input: { placeholder: "Reason, e.g. GSTIN cancelled on the GST portal" } });
+  if (reason == null) return;
+  try { await postJSON(`/api/vendors/${id}/block`, { reason, actor: reviewer() }); toast("Vendor blocked"); after && after(); } catch (e) { toast(e.message, "error"); }
 }
 
 /* Correct & re-check: a person types or fixes the fields; the document re-runs through every rule. */
@@ -940,7 +973,7 @@ function renderFixForm(st) {
     <form id="fixf" class="fix-grid">
       ${inp("vendor_name", "Vendor", "text", true)}${inp("invoice_number", "Invoice #")}${inp("invoice_date", "Invoice date", "date")}
       ${inp("po_reference", "PO number")}${inp("due_date", "Due date", "date")}${inp("payment_terms", "Payment terms")}
-      ${inp("subtotal", "Subtotal", "number")}${inp("tax_amount", "Tax", "number")}${inp("shipping_amount", "Shipping", "number")}${inp("total_amount", "Total", "number")}
+      ${inp("subtotal", "Subtotal", "number")}${inp("discount_amount", "Discount", "number")}${inp("tax_amount", "GST", "number")}${inp("shipping_amount", "Shipping", "number")}${inp("round_off", "Round off (±)", "number")}${inp("total_amount", "Total", "number")}
     </form>
     <div class="sect"><h3>Line items</h3><div class="table-wrap"><table class="lines"><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th><th></th></tr></thead>
       <tbody id="lines">${lines.map(lineRow).join("")}</tbody></table></div>
@@ -955,7 +988,7 @@ function renderFixForm(st) {
   box.scrollIntoView({ behavior: "smooth", block: "start" });
   $("#fixgo").onclick = async () => {
     const fd = new FormData($("#fixf")), body = { note: $("#fixnote").value, actor: reviewer() };
-    for (const [k, v] of fd.entries()) body[k] = ["subtotal", "tax_amount", "shipping_amount", "total_amount"].includes(k) ? (v === "" ? null : Number(v)) : v;
+    for (const [k, v] of fd.entries()) body[k] = ["subtotal", "discount_amount", "tax_amount", "shipping_amount", "round_off", "total_amount"].includes(k) ? (v === "" ? null : Number(v)) : v;
     body.line_items = [...$$("#lines tr")].map((tr) => { const g = (n) => tr.querySelector(`[name=${n}]`).value; const num = (n) => (g(n) === "" ? null : Number(g(n)));
       return { description: g("description"), quantity: num("quantity"), unit_price: num("unit_price"), amount: num("amount") }; }).filter((l) => l.description || l.amount != null);
     try { const { run_id } = await postJSON(`/api/runs/${st.run.id}/rekey`, body); toast("Re-checking with the corrected details…"); location.hash = `#/runs/${run_id}`; }
@@ -1011,7 +1044,7 @@ async function viewQueue() {
 async function viewData() {
   const [d, dbi] = await Promise.all([api("/api/reference"), api("/api/db")]);
   const vname = Object.fromEntries(d.vendors.map((v) => [v.vendor_id, v.legal_name]));
-  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Ledger &amp; records</span><h1>Orders, vendors &amp; payments</h1><p>What every invoice is checked against. The payment record updates each time an invoice is approved, which is how repeat bills and over-billing get caught.</p></div></div>
+  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Ledger &amp; records</span><h1>Orders, vendors &amp; payments</h1><p>What every invoice is checked against. The payment record updates each time an invoice is approved (that's how repeat bills and over-billing get caught), and the vendor list grows on its own as new vendors send invoices.</p></div></div>
   <div class="card pad db-card"><div class="db-head"><div><h3>Database</h3><div class="db-title">${esc(dbi.engine)} · <span class="mono">${esc(dbi.file)}</span> · ${((n) => (n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB"))(dbi.size_bytes)}</div>
       <div class="faint small">Everything lives in this one file: invoices, the payment record, review history, your rules, and the original documents.</div></div>
       <a class="btn sm" href="/api/db/backup" download>${icon.download} Download backup</a></div>
@@ -1028,9 +1061,9 @@ async function viewData() {
     <tbody>${d.ledger.slice().reverse().map((l) => `<tr><td class="mono">${esc(l.invoice_number)}</td><td>${esc(vname[l.vendor_id] || l.vendor_id)}</td><td class="mono">${esc(l.po_number || "")}</td>
       <td class="num">${money(l.net_amount)}</td><td class="num">${money(l.total_amount)}</td><td><span class="badge ${l.status === "paid" ? "pass" : "info"}">${esc(l.status)}</span></td>
       <td>${esc(l.posted_at)}</td><td class="mono">${esc(l.payment_ref || "")}</td><td>${l.source_run_id === "seed" ? `<span class="faint">earlier</span>` : `<a href="#/runs/${l.source_run_id}" style="text-decoration:underline">this app</a>`}</td></tr>`).join("")}</tbody></table></div></div>
-  <div class="card panel" style="margin-top:16px"><div class="panel-head"><span class="t">Vendors</span></div><div class="table-wrap"><table>
-    <thead><tr><th>ID</th><th>Name</th><th>Tax ID</th><th>Status</th><th>Terms</th><th>Bank on file</th><th>Email domain</th><th>Phone on file</th></tr></thead>
-    <tbody>${d.vendors.map((v) => `<tr><td class="mono">${esc(v.vendor_id)}</td><td>${esc(v.legal_name)}</td><td class="mono">${esc(v.tax_id)}</td><td><span class="badge ${v.status === "active" ? "pass" : "fail"}">${esc(v.status)}</span></td><td>${esc(v.payment_terms)}</td><td>${esc(v.bank)}</td><td class="mono">${esc(v.email_domain)}</td><td class="mono">${esc(v.phone_on_file)}</td></tr>`).join("")}</tbody></table></div></div>`;
+  <div class="card panel" style="margin-top:16px"><div class="panel-head"><div><span class="t">Vendor list ${tip("Not a master file: built automatically from the payment history and from each new vendor's first invoice.")}</span><div class="faint small">${d.vendors.length} vendors · learned, not loaded</div></div><a class="btn sm" href="#/vendors">Manage vendors →</a></div><div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>Name</th><th>GSTIN</th><th>Status</th><th>Known from</th><th>Terms</th><th>Bank on file</th><th>IFSC</th><th>Email domain</th></tr></thead>
+    <tbody>${d.vendors.map((v) => `<tr><td class="mono">${esc(v.vendor_id)}</td><td>${esc(v.legal_name)}</td><td class="mono">${esc(v.tax_id || "—")}</td><td><span class="badge ${{ active: "pass", unverified: "warn", blocked: "fail" }[v.status]}">${esc({ active: "verified", unverified: "unverified", blocked: "blocked" }[v.status])}</span></td><td>${v.source === "first invoice" ? `<a href="#/runs/${esc(v.first_run_id)}" style="text-decoration:underline">first invoice</a>` : "payment history"}</td><td>${esc(v.payment_terms || "—")}</td><td>${esc(v.bank)}</td><td class="mono">${esc(v.ifsc || "—")}</td><td class="mono">${esc(v.email_domain || "—")}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
 
 /* ------------------------------------------------------------------ vendors */
@@ -1039,12 +1072,14 @@ async function viewVendors() {
   refreshChrome();
   const maxSpend = Math.max(1, ...vendors.map((v) => v.approved_spend));
   const flagged = vendors.filter((v) => v.flags.length).length;
+  vendors.sort((a, b) => (a.status === "unverified" ? -1 : 0) - (b.status === "unverified" ? -1 : 0));
   app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Vendors</span><h1>Who's billing you</h1>
-    <p>Every vendor on file, with what they've sent, what was paid, what's waiting, and anything that looked wrong. Profiles are built from the invoices processed here; approving a new vendor still happens in vendor setup.</p></div>
+    <p>There's no vendor master to maintain. NoCap learns vendors: anyone you've paid before is known, and a new vendor is added automatically from their first invoice, then verified once by a person.</p></div>
     <div class="actions"><span class="attn ${flagged ? "" : "ok"}"><b>${flagged}</b>${flagged === 1 ? "vendor needs" : "vendors need"} attention</span></div></div>
   <div class="grid vendor-grid">${vendors.map((v) => `<div class="card vendor ${v.flags.length ? "flagged" : ""}">
       <div class="v-head"><div style="min-width:0"><div class="v-name">${esc(v.name)}</div><div class="faint mono small">${esc(v.vendor_id)} · ${esc(v.terms)} · ${esc(v.email_domain)}</div></div>
-        <span class="badge ${v.status === "active" ? "pass" : "fail"}">${v.status === "active" ? "Active" : "Blocked"}</span></div>
+        <span class="badge ${{ active: "pass", unverified: "warn", blocked: "fail" }[v.status]}">${{ active: "Verified", unverified: "Unverified", blocked: "Blocked" }[v.status]}</span></div>
+      <div class="v-src faint small">${v.source === "first invoice" ? `Added ${ago(v.created_at)} from <a href="#/runs/${esc(v.first_run_id)}">their first invoice</a>` : "Known from payment history"}${v.verified_by && v.source === "first invoice" ? ` · verified by ${esc(v.verified_by)}` : ""}${v.status === "blocked" && v.status_reason ? ` · blocked: ${esc(v.status_reason)}` : ""}</div>
       ${v.flags.length ? `<div class="v-flags">${v.flags.map((f) => `<span>${icon.flag}${esc(f)}</span>`).join("")}</div>` : ""}
       <div class="v-stats">
         <div><b>${v.invoices}</b><span>invoices here</span></div>
@@ -1054,10 +1089,20 @@ async function viewVendors() {
       <div class="hbar-track v-track" title="Approved spend compared with your top vendor">${v.approved_spend ? `<span style="width:${(100 * v.approved_spend) / maxSpend}%;background:var(--c-bar)"></span>` : ""}</div>
       <dl class="kv small" style="margin-top:12px"><dt>Open orders</dt><dd>${v.open_pos} · ${v.open_po_balance < 0 ? `billed ${money(-v.open_po_balance)} over (within tolerance)` : `${money(v.open_po_balance)} left to bill`}</dd>
         <dt>Paid to</dt><dd>${esc(v.bank)} <span class="faint">(only this account is ever paid)</span></dd>
+        <dt>GSTIN</dt><dd class="mono">${esc(v.tax_id || "—")}</dd>
         <dt>Billed to date</dt><dd>${money(v.lifetime_billed)}</dd><dt>Last invoice</dt><dd>${v.last_seen ? ago(v.last_seen) : "—"}</dd></dl>
+      <div class="v-actions">${v.status === "unverified" ? `<button class="btn sm ok" data-verify="${esc(v.vendor_id)}">${icon.shield} Verify vendor</button>` : ""}
+        ${v.status === "blocked" ? `<button class="btn sm" data-unblock="${esc(v.vendor_id)}">Unblock</button>` : `<button class="btn sm ghost" data-block="${esc(v.vendor_id)}">Block</button>`}</div>
     </div>`).join("")}</div>
   ${unknown.length ? `<div class="card panel" style="margin-top:16px"><div class="panel-head"><span class="t">Not on file</span><span class="faint small">Senders we couldn't match to a vendor. They go to the vendor setup team.</span></div>
     <div class="table-wrap"><table><tbody>${unknown.map((u) => `<tr><td>${esc(u.name)}</td><td class="num">${u.invoices} invoice${u.invoices === 1 ? "" : "s"}</td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
+  $$("[data-verify]").forEach((b) => (b.onclick = async () => {
+    if (!(await ask({ title: "Verify this vendor?", ok: "Verify & re-check", icon: icon.shield, body: "Their GSTIN and bank become the reference, and their waiting invoices are re-checked against every rule." }))) return;
+    try { const out = await postJSON(`/api/vendors/${b.dataset.verify}/verify`, { actor: reviewer() }); toast(`Vendor verified. ${out.rechecked.length} invoice${out.rechecked.length === 1 ? "" : "s"} re-checked.`); refreshChrome(); viewVendors(); }
+    catch (e) { toast(e.message, "error"); }
+  }));
+  $$("[data-block]").forEach((b) => (b.onclick = () => blockVendor(b.dataset.block, viewVendors)));
+  $$("[data-unblock]").forEach((b) => (b.onclick = async () => { try { await postJSON(`/api/vendors/${b.dataset.unblock}/unblock`, { actor: reviewer() }); toast("Vendor unblocked"); viewVendors(); } catch (e) { toast(e.message, "error"); } }));
 }
 
 /* ------------------------------------------------------------------ rules */

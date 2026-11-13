@@ -56,6 +56,7 @@ LIVE_LOCK = threading.Lock()
 
 
 # ============================================================ helpers
+AMT_MATCH = 1.0  # same amount for repeat checks: within ₹1, so a copy rounded off to the rupee still matches
 GST_SLABS = (0.25, 3, 5, 12, 18, 28, 40)  # GST rate slabs in India (combined CGST+SGST or IGST)
 
 
@@ -249,7 +250,7 @@ def human_action(run_id: str, action: str, actor: str, note: str) -> dict:
 
 
 MANUAL_FIELDS = ("vendor_name", "invoice_number", "invoice_date", "due_date", "po_reference", "payment_terms", "currency",
-                 "vendor_email", "subtotal", "tax_amount", "shipping_amount", "total_amount", "line_items")
+                 "vendor_email", "subtotal", "discount_amount", "tax_amount", "shipping_amount", "round_off", "total_amount", "line_items")
 
 
 def rekey(run_id: str, fields: dict, actor: str, note: str) -> str:
@@ -274,6 +275,28 @@ def rekey(run_id: str, fields: dict, actor: str, note: str) -> str:
     db.update_run(run_id, review_status="corrected")
     db.add_audit(run_id, actor, "corrected", f"{note} → re-checked as {new_id}")
     db.add_audit(new_id, actor, "keyed_in", f"Corrected from {run_id}: {note}")
+    return new_id
+
+
+def _po_is_vendors(po: dict, vendor: dict) -> bool:
+    """POs name the vendor by ID and GSTIN, so a vendor re-learned from an invoice still matches POs raised for them."""
+    g = (vendor.get("tax_id") or "").upper()
+    return po["vendor_id"] == vendor["vendor_id"] or bool(g and g == (po.get("vendor_gstin") or "").upper())
+
+
+def recheck(run_id: str, actor: str, note: str) -> str:
+    """Run the same document through every rule again (e.g. after its vendor was verified). The original is
+    marked superseded first, so the new run isn't flagged as a duplicate of it."""
+    run = db.get_run(run_id)
+    if not run or run["decision"] != "HOLD" or run.get("review_status") not in (None, "pending"):
+        raise ValueError("only invoices waiting for review can be re-checked")
+    f = db.get_file(run_id)
+    if not f:
+        raise ValueError("the original document is no longer stored")
+    db.update_run(run_id, review_status="corrected")
+    new_id = start_run(f[0], run["filename"], f"re-checked from {run_id}", saved_read=True)
+    db.add_audit(run_id, actor, "rechecked", f"{note} → re-checked as {new_id}")
+    db.add_audit(new_id, actor, "rechecked_from", f"Re-checked from {run_id}: {note}")
     return new_id
 
 
@@ -429,7 +452,7 @@ def st_extract(ctx):
 
 def _normalise(d: dict) -> dict:
     inv = dict(d)
-    for k in ("subtotal", "tax_amount", "shipping_amount", "total_amount", "tax_rate_pct"):
+    for k in ("subtotal", "tax_amount", "shipping_amount", "total_amount", "tax_rate_pct", "round_off", "discount_amount"):
         inv[k] = r2(inv.get(k))
     inv["line_items"] = [{"description": li.get("description") or "", "quantity": li.get("quantity"),
                           "unit_price": r2(li.get("unit_price")), "amount": r2(li.get("amount"))}
@@ -506,13 +529,32 @@ def st_validate(ctx):
 
     # totals & tax (tax may be separate or embedded)
     total, tax, ship = inv.get("total_amount"), inv.get("tax_amount") or 0.0, inv.get("shipping_amount") or 0.0
+    ro = inv.get("round_off") or 0.0
+    disc = abs(inv.get("discount_amount") or 0.0)
+    if disc and sub:
+        pct_d = 100 * disc / sub
+        checks.append(chk("val.discount", "Discount detected", "pass" if pct_d <= 30 else "warn",
+                          f"Discount of {money(disc)} ({pct_d:.2f}% of {money(sub)}) deducted before GST; taxable value {money(sub - disc)}"
+                          + ("" if pct_d <= 30 else ". Unusually large: worth a glance."), evidence={"discount": disc, "pct": round(pct_d, 2)}))
     if total is not None and sub is not None:
-        expected = sub if inv.get("tax_inclusive") else r2(sub + tax + ship)
-        ok = abs(expected - total) <= tol
-        how = "tax-inclusive pricing" if inv.get("tax_inclusive") else f"subtotal {money(sub)} + tax {money(tax)}" + (f" + shipping {money(ship)}" if ship else "")
-        checks.append(chk("val.total", "Totals reconcile", "pass" if ok else "fail",
-                          f"{how} = {money(expected)} vs stated total {money(total)}", None if ok else "hold", None if ok else "ap"))
-    net = (total - tax) if (inv.get("tax_inclusive") and total is not None) else ((sub or 0) + ship)
+        expected = (sub - disc) if inv.get("tax_inclusive") else r2(sub - disc + tax + ship)
+        how = "tax-inclusive pricing" if inv.get("tax_inclusive") else (f"subtotal {money(sub)}" + (f" − discount {money(disc)}" if disc else "")
+                                                                         + f" + tax {money(tax)}" + (f" + shipping {money(ship)}" if ship else ""))
+        gap = r2(total - expected)
+        max_ro = P.get("round_off_max", 1.0)
+        if abs(gap) <= tol:
+            checks.append(chk("val.total", "Totals reconcile", "pass", f"{how} = {money(expected)} vs stated total {money(total)}"))
+        elif abs(gap) <= max_ro and (abs(gap - ro) <= tol or abs(total - round(total)) <= tol):
+            # Indian invoices round the payable to the nearest rupee ("Round Off -0.40"): accept it, and say so.
+            checks.append(chk("val.total", "Totals reconcile", "pass",
+                              f"{how} = {money(expected)}, rounded off by {'+' if gap > 0 else '−'}{money(abs(gap))} to {money(total)}"
+                              + ("" if ro else " (no round-off line printed)")))
+        else:
+            checks.append(chk("val.total", "Totals reconcile", "fail",
+                              f"{how} = {money(expected)} vs stated total {money(total)}"
+                              + (f"; off by {money(abs(gap))}, more than a round-off (max {money(max_ro)})" if abs(gap) <= 50 else ""),
+                              "hold", "ap"))
+    net = (total - tax) if (inv.get("tax_inclusive") and total is not None) else ((sub or 0) - disc + ship)
     ctx["net_amount"] = r2(net)
     if tax and net:
         rate = 100 * tax / (net if not inv.get("tax_inclusive") else net)
@@ -588,57 +630,82 @@ def st_validate(ctx):
 
 
 def st_vendor(ctx):
-    inv, vendors, checks = ctx["inv"], ctx["master"]["vendors"], []
+    inv, checks = ctx["inv"], []
+    vendors = db.vendors_all()  # learned list: payment history + vendors added from their first invoice
     name = inv.get("vendor_name") or ""
     email_dom = (inv.get("vendor_email") or "").split("@")[-1].lower() or None
+    gstin = (inv.get("vendor_tax_id") or "").replace(" ", "").replace("-", "").upper()
     scored = []
     for v in vendors:
         s = max(text_sim(norm_company(name), norm_company(n)) for n in [v["legal_name"]] + v["aliases"])
-        if inv.get("vendor_tax_id") and inv["vendor_tax_id"].replace("-", "") == v["tax_id"].replace("-", ""):
+        if gstin and gstin == v["tax_id"].replace("-", "").upper():
             s = max(s, 0.97)
         scored.append((round(s, 3), v))
     scored.sort(key=lambda x: -x[0])
-    best_s, best = scored[0]
+    best_s, best = scored[0] if scored else (0.0, None)
     cands = [{"vendor_id": v["vendor_id"], "name": v["legal_name"], "score": s} for s, v in scored[:3]]
-    if best_s < 0.6:
-        checks.append(chk("ven.match", "Vendor in master file", "fail",
-                          f"'{name}' does not match any approved vendor (best: {best['legal_name']} at {best_s:.2f}). Start vendor onboarding before paying.",
-                          "hold", "vendor_mgmt", evidence={"candidates": cands}))
-        ctx["halt_po"] = True
-        return {"summary": "Unknown vendor: not in the approved vendor master.", "checks": checks, "data": {"candidates": cands}}
+    if best is None or best_s < 0.6:
+        if not name.strip() and not gstin:
+            checks.append(chk("ven.match", "Vendor on file", "fail", "No vendor name or GSTIN could be read, so the vendor can't be identified.",
+                              "hold", "ap", evidence={"candidates": cands}))
+            ctx["halt_po"] = True
+            return {"summary": "Vendor could not be identified.", "checks": checks, "data": {"candidates": cands}}
+        best = db.vendor_add_from_invoice(inv, ctx["run_id"])
+        ctx["vendor"], ctx["new_vendor"] = best, True
+        b = best["bank"]
+        checks.append(chk("ven.match", "Vendor on file", "fail",
+                          f"New vendor: {best['legal_name']} ({best['vendor_id']}) was added to the vendor list from this invoice"
+                          + (f", GSTIN {best['tax_id']}" if best["tax_id"] else ", no GSTIN printed")
+                          + (f", paid to {b['bank_name'] or 'a bank'} IFSC {b['ifsc'] or '—'} a/c ••••{b['account_number'][-4:]}" if b["account_number"] else "")
+                          + ". Verify the vendor once before anything is paid; their details then become the reference for every later invoice.",
+                          "hold", "vendor_mgmt", evidence={"candidates": cands, "vendor": best}))
+        ctx["fraud_signals"] = []
+        note = inv.get("payment_instruction_notes") or ""
+        if re.search(r"(new|changed?|update[ds]?)\s+(bank|account|banking|remit)|changed banks", note, re.I):
+            ctx["fraud_signals"].append("invoice announces a change of bank details")
+            checks.append(chk("ven.change_notice", "Change-of-bank language", "fail",
+                              f"Invoice text: “{note[:160]}”. A brand-new vendor asking to change banks is a red flag.", "hold", "fraud"))
+        return {"summary": f"New vendor added: {best['legal_name']} ({best['vendor_id']}). Needs a one-time verification.",
+                "checks": checks, "data": {"vendor": {k: best[k] for k in ("vendor_id", "legal_name", "status", "payment_terms", "phone_on_file", "email_domain")},
+                                           "new_vendor": True, "candidates": cands, "fraud_signals": ctx["fraud_signals"]}}
     ctx["vendor"] = best
-    checks.append(chk("ven.match", "Vendor in master file", "pass" if best_s >= 0.85 else "warn",
-                      f"Matched {best['vendor_id']} {best['legal_name']} (similarity {best_s:.2f})", evidence={"candidates": cands}))
+    checks.append(chk("ven.match", "Vendor on file", "pass" if best_s >= 0.85 else "warn",
+                      f"Matched {best['vendor_id']} {best['legal_name']} (similarity {best_s:.2f}; known from {best.get('source') or 'the vendor list'})",
+                      evidence={"candidates": cands}))
 
-    if best["status"] != "active":
+    if best["status"] == "blocked":
         checks.append(chk("ven.status", "Vendor is active", "fail",
-                          f"Vendor status is '{best['status']}': {best.get('status_reason', '')}", "reject"))
+                          f"Vendor is blocked for payment: {best.get('status_reason') or 'no reason recorded'}", "reject"))
+    elif best["status"] == "unverified":
+        checks.append(chk("ven.status", "Vendor is verified", "fail",
+                          f"{best['legal_name']} was added on {(best.get('created_at') or '')[:10]} from their first invoice and hasn't been verified yet.",
+                          "hold", "vendor_mgmt"))
     else:
-        checks.append(chk("ven.status", "Vendor is active", "pass", "Active, approved for payment"))
+        checks.append(chk("ven.status", "Vendor is active", "pass", "Verified, approved for payment"))
 
-    if inv.get("vendor_tax_id"):
-        ok = inv["vendor_tax_id"].replace("-", "") == best["tax_id"].replace("-", "")
-        checks.append(chk("ven.taxid", "Tax ID matches master", "pass" if ok else "fail",
-                          f"Invoice {inv['vendor_tax_id']} vs master {best['tax_id']}", None if ok else "hold", None if ok else "vendor_mgmt"))
+    if gstin and best["tax_id"]:
+        ok = gstin == best["tax_id"].replace("-", "").upper()
+        checks.append(chk("ven.taxid", "GSTIN matches vendor record", "pass" if ok else "fail",
+                          f"Invoice {inv['vendor_tax_id']} vs on file {best['tax_id']}", None if ok else "hold", None if ok else "vendor_mgmt"))
 
     # Bank details: the single most important fraud control in AP.
     bank = inv.get("bank_details") or {}
     mb = best["bank"]
     fraud_signals = []
-    if bank.get("account_number") or bank.get("ifsc"):
+    if (bank.get("account_number") or bank.get("ifsc")) and mb["account_number"]:
         acct_ok = (bank.get("account_number") or "") == mb["account_number"]
         rout_ok = (bank.get("ifsc") or mb["ifsc"]).upper().replace(" ", "") == mb["ifsc"]
         if acct_ok and rout_ok:
-            checks.append(chk("ven.bank", "Remit-to bank matches master", "pass",
-                              f"Account ••••{mb['account_number'][-4:]} at {mb['bank_name']} matches the vendor master"))
+            checks.append(chk("ven.bank", "Remit-to bank matches vendor record", "pass",
+                              f"Account ••••{mb['account_number'][-4:]} at {mb['bank_name']} matches the account on file"))
         else:
-            fraud_signals.append("bank account differs from vendor master")
-            checks.append(chk("ven.bank", "Remit-to bank matches master", "fail",
+            fraud_signals.append("bank account differs from the verified account on file")
+            checks.append(chk("ven.bank", "Remit-to bank matches vendor record", "fail",
                               f"Invoice says {bank.get('bank_name') or 'a bank'} IFSC {bank.get('ifsc')} a/c ••••{(bank.get('account_number') or '????')[-4:]}; "
-                              f"master has {mb['bank_name']} ••••{mb['account_number'][-4:]}",
+                              f"on file: {mb['bank_name']} ••••{mb['account_number'][-4:]}",
                               "hold", "fraud", evidence={"invoice": bank, "master_last4": mb["account_number"][-4:]}))
     else:
-        checks.append(chk("ven.bank", "Remit-to bank matches master", "info", "No remit details on the invoice. Payment will go to the master-file account."))
+        checks.append(chk("ven.bank", "Remit-to bank matches vendor record", "info", "No remit details on the invoice (or none on file yet). Payment only ever goes to the verified account on file."))
 
     note = inv.get("payment_instruction_notes") or ""
     if re.search(r"(new|changed?|update[ds]?)\s+(bank|account|banking|remit)|changed banks", note, re.I):
@@ -646,18 +713,18 @@ def st_vendor(ctx):
         checks.append(chk("ven.change_notice", "Change-of-bank language", "fail",
                           f"Invoice text: “{note[:160]}”. Bank changes are only accepted through vendor management, never from an invoice.",
                           "hold", "fraud"))
-    if email_dom:
+    if email_dom and best["email_domain"]:
         dom_ok = email_dom == best["email_domain"] or email_dom.endswith("." + best["email_domain"])
         if not dom_ok:
             lookalike = SequenceMatcher(None, email_dom, best["email_domain"]).ratio()
             if lookalike > 0.5:
                 fraud_signals.append(f"look-alike sender domain ({email_dom})")
-            checks.append(chk("ven.domain", "Sender domain matches master", "fail" if lookalike > 0.5 else "warn",
-                              f"Invoice email domain '{email_dom}' vs master '{best['email_domain']}'"
+            checks.append(chk("ven.domain", "Sender domain matches vendor record", "fail" if lookalike > 0.5 else "warn",
+                              f"Invoice email domain '{email_dom}' vs on file '{best['email_domain']}'"
                               + (f". Look-alike domain (similarity {lookalike:.2f})." if lookalike > 0.5 else ""),
                               "hold" if lookalike > 0.5 else None, "fraud" if lookalike > 0.5 else None))
         else:
-            checks.append(chk("ven.domain", "Sender domain matches master", "pass", f"{email_dom}"))
+            checks.append(chk("ven.domain", "Sender domain matches vendor record", "pass", f"{email_dom}"))
     ctx["fraud_signals"] = fraud_signals
     return {"summary": f"{best['legal_name']} ({best['vendor_id']})"
                        + (f". {len(fraud_signals)} payment-fraud signal(s)." if fraud_signals else ". Verified."),
@@ -685,7 +752,7 @@ def st_duplicates(ctx):
     ledger = [r for r in db.ledger_rows() if r["vendor_id"] == vendor["vendor_id"]]
     hit = next((r for r in ledger if r["invoice_number_norm"] == n), None)
     if hit:
-        same_amt = hit["total_amount"] is not None and inv.get("total_amount") is not None and abs(hit["total_amount"] - inv["total_amount"]) <= 0.05
+        same_amt = hit["total_amount"] is not None and inv.get("total_amount") is not None and abs(hit["total_amount"] - inv["total_amount"]) <= AMT_MATCH
         paid = f", paid {hit['payment_ref']}" if hit.get("payment_ref") else ""
         detail = (f"'{inv['invoice_number']}' normalises to {n}, the same as ledger entry '{hit['invoice_number']}' "
                   f"(booked {hit['posted_at']}{paid}, {money(hit['total_amount'])})")
@@ -710,7 +777,7 @@ def st_duplicates(ctx):
     # fuzzy: same vendor, same amount, close dates, different number. Catches renumbered resubmissions.
     d = iso(inv.get("invoice_date"))
     fuzzy = [r for r in ledger if r["invoice_number_norm"] != n and inv.get("total_amount") is not None
-             and abs((r["total_amount"] or 0) - inv["total_amount"]) <= 0.05 and d and iso(r["invoice_date"])
+             and abs((r["total_amount"] or 0) - inv["total_amount"]) <= AMT_MATCH and d and iso(r["invoice_date"])
              and abs((iso(r["invoice_date"]) - d).days) <= P["fuzzy_duplicate_window_days"]]
     if fuzzy:
         checks.append(chk("dup.fuzzy", "No near-duplicate (same amount, nearby date)", "fail",
@@ -773,7 +840,7 @@ def st_po_match(ctx):
         nref = re.sub(r"[^0-9]", "", ref)
         po = next((p for p in pos if p["po_number"] == ref), None) or \
              next((p for p in pos if re.sub(r"[^0-9]", "", p["po_number"]) == nref and nref), None)
-        if po and po["vendor_id"] != vendor["vendor_id"]:
+        if po and not _po_is_vendors(po, vendor):
             checks.append(chk("po.identify", "PO identified", "fail",
                               f"{po['po_number']} belongs to a different vendor ({po['vendor_id']})", "hold", "procurement"))
             return {"summary": "PO quoted belongs to another vendor.", "checks": checks, "data": {}}
@@ -786,7 +853,7 @@ def st_po_match(ctx):
     if not po:
         cands = []
         for p in pos:
-            if p["vendor_id"] != vendor["vendor_id"] or p["status"] != "open":
+            if not _po_is_vendors(p, vendor) or p["status"] != "open":
                 continue
             stt = _po_state(p)
             lm = _match_lines(inv["line_items"], p)
@@ -861,7 +928,12 @@ def st_po_match(ctx):
     variance = round(net - expected, 2)
     allowed = round(min(P["price_tolerance_pct"] / 100 * expected, P["price_tolerance_abs"]), 2)
     pct = (variance / expected * 100) if expected else 0
-    if variance <= 0.005:
+    disc = abs(inv.get("discount_amount") or 0.0)
+    if disc and abs(variance + disc) <= 0.5:  # lines match the PO; the vendor then gave a discount
+        checks.append(chk("po.price", "Price & quantity vs PO", "pass",
+                          f"Lines match the PO value {money(expected)}; the vendor's {money(disc)} discount brings the net to {money(net)}",
+                          evidence={"lines": rows}))
+    elif variance <= 0.005:
         checks.append(chk("po.price", "Price & quantity vs PO", "pass" if variance > -0.005 else "info",
                           f"Invoice net {money(net)} vs PO value of billed lines {money(expected)}"
                           + ("" if variance > -0.005 else f" (under-billed by {money(-variance)})"), evidence={"lines": rows}))
@@ -968,6 +1040,8 @@ def st_decision(ctx):
     elif holds:
         out["decision"] = "HOLD"
         qkeys = sorted({c["route"] or "ap" for c in holds}, key=lambda q: QUEUES[q]["priority"])
+        if "vendor_mgmt" in qkeys and qkeys[0] != "fraud" and (ctx.get("new_vendor") or vendor.get("status") == "unverified"):
+            qkeys = ["vendor_mgmt"] + [k for k in qkeys if k != "vendor_mgmt"]  # verifying the vendor comes first
         q = QUEUES[qkeys[0]]
         out["route"] = qkeys[0]
         out["route_name"] = q["name"]
@@ -977,12 +1051,12 @@ def st_decision(ctx):
         if qkeys[0] == "fraud":
             sig = ctx.get("fraud_signals") or []
             out["headline"] = f"On hold for Treasury & Fraud: {len(sig)} payment-fraud signal(s) on an otherwise clean invoice."
-            out["internal_task"] = (f"Call {vendor.get('legal_name')} on the phone number in the vendor master ({vendor.get('phone_on_file')}), "
+            out["internal_task"] = (f"Call {vendor.get('legal_name')} on the phone number on file ({vendor.get('phone_on_file') or 'from your past correspondence'}), "
                                     "NOT any number or email on this invoice, to confirm whether they changed banks. "
                                     "Only Vendor Management may update bank details, after documented verification. "
                                     "Until then, do not pay, and do not reply to the invoice's email address.")
             out["next_actions"] = ["Verbal callback to the number on file", "If not confirmed: report as attempted fraud, notify the vendor's real AP contact",
-                                   "If confirmed: Vendor Management updates the master, then release"]
+                                   "If confirmed: Vendor Management updates the bank on the vendor record, then release"]
             out["money_protected"] = inv.get("total_amount")
         elif any(c["id"] == "po.cumulative" for c in holds):
             pa = ctx.get("partial_approval", 0)
@@ -991,8 +1065,15 @@ def st_decision(ctx):
             out["next_actions"] = [f"Buyer raises a PO change order to cover the overrun, or",
                                    f"Approve a partial payment of {money(pa)} (the remaining PO balance) and dispute the rest with the vendor"]
         elif qkeys[0] == "vendor_mgmt":
-            out["headline"] = "On hold: vendor isn't in the approved vendor master."
-            out["next_actions"] = ["Vendor Management runs onboarding (W-9, bank verification, sanctions screening)", "Re-run once the vendor is approved"]
+            if ctx.get("new_vendor"):
+                out["headline"] = f"On hold: {vendor.get('legal_name')} is a new vendor. Verify them once, then this invoice is re-checked automatically."
+            elif vendor.get("status") == "unverified":
+                out["headline"] = f"On hold: {vendor.get('legal_name')} hasn't been verified yet."
+            else:
+                out["headline"] = f"On hold for Vendor Management: " + holds[0]["detail"].rstrip(".") + "."
+            out["vendor_to_verify"] = vendor.get("vendor_id") if vendor.get("status") == "unverified" else None
+            out["next_actions"] = ["Check the GSTIN on the GST portal and confirm the bank account (cancelled cheque or a call to a known contact)",
+                                   "Click Verify vendor: this invoice and any others from them are re-checked against every rule"]
         else:
             out["headline"] = f"On hold for {q['name']}: " + holds[0]["detail"].rstrip(".") + "."
             out["next_actions"] = ["Reviewer checks the flagged items against the PDF, then approves or rejects with a note"]
@@ -1019,7 +1100,7 @@ def _payment_plan(inv, vendor, po, ctx) -> dict:
     d = iso(inv.get("invoice_date")) or TODAY()
     due = d + timedelta(days=terms["net_days"])
     plan = {"terms": inv.get("payment_terms") or vendor.get("payment_terms"), "due_date": due.isoformat(), "pay_on": due.isoformat(),
-            "pay_to": f"{vendor['bank']['bank_name']} ••••{vendor['bank']['account_number'][-4:]} (vendor master)",
+            "pay_to": f"{vendor['bank']['bank_name']} ••••{vendor['bank']['account_number'][-4:]} (verified account on file)",
             "amount": inv.get("total_amount")}
     if terms["discount_pct"]:
         disc_by = d + timedelta(days=terms["discount_days"])

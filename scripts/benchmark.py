@@ -57,6 +57,8 @@ FIELDS = {
     "Subtotal": lambda g, t: money_eq(g.get("subtotal"), t["subtotal"]),
     "Tax": lambda g, t: money_eq(g.get("tax_amount"), t["tax_amount"]),
     "Shipping": lambda g, t: money_eq(g.get("shipping_amount"), t["shipping_amount"]),
+    "Discount": lambda g, t: money_eq(g.get("discount_amount") or 0, t["discount_amount"] or 0),
+    "Round off": lambda g, t: money_eq(g.get("round_off") or 0, t["round_off"] or 0),
     "Total": lambda g, t: money_eq(g.get("total_amount"), t["total_amount"]),
     "Line items (count & amounts)": lambda g, t: len(g.get("line_items") or []) == len(t["line_items"]) and all(
         money_eq(a.get("amount"), b["amount"]) for a, b in zip(g.get("line_items") or [], t["line_items"])),

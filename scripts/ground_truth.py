@@ -13,6 +13,8 @@ def truth(spec: dict) -> dict:
     amt = lambda v: float(v.replace("Rs.", "").replace(",", "").strip())
     num = lambda *labels: next((amt(v) for l, v, _ in spec["totals"] if l.startswith(labels)), None)
     gst = [amt(v) for l, v, _ in spec["totals"] if l.startswith(("CGST", "SGST", "IGST"))]
+    ro = next((amt(v) for l, v, _ in spec["totals"] if l.startswith("Round Off")), None)
+    disc = next((abs(amt(v)) for l, v, _ in spec["totals"] if l.startswith("Less")), None)
     notes = " ".join(n.lstrip("!") for n in spec.get("notes", []))
     ifsc = re.search(r"IFSC\s+([A-Z]{4}0[A-Z0-9]{6})", notes)
     acct = re.search(r"A/c No\.\s+(\d{6,})", notes)
@@ -28,7 +30,7 @@ def truth(spec: dict) -> dict:
         "po_reference": po, "payment_terms": meta.get("Terms"), "currency": "INR",
         "line_items": [{"description": l["description"], "quantity": l["qty"], "unit_price": l["unit_price"],
                         "amount": round(l["qty"] * l["unit_price"], 2)} for l in spec["lines"]],
-        "subtotal": num("Subtotal", "Taxable Value"), "tax_amount": round(sum(gst), 2) if gst else None, "tax_rate_pct": None, "shipping_amount": num("Shipping"),
+        "subtotal": num("Gross Amount", "Subtotal", "Taxable Value"), "discount_amount": disc, "tax_amount": round(sum(gst), 2) if gst else None, "tax_rate_pct": None, "shipping_amount": num("Shipping"), "round_off": ro,
         "total_amount": total, "tax_inclusive": False,
         "bank_details": {"bank_name": None, "ifsc": ifsc.group(1) if ifsc else None,
                          "account_number": acct.group(1) if acct else None, "iban": None, "swift": None},

@@ -279,9 +279,15 @@ def photograph(pdf_bytes: bytes, seed: int = 11) -> bytes:
 
 
 # --------------------------------------------------------------------------- specs
-def totals(sub, gst=None, rate=18, ship=None, label_total="Total (INR)", note=None):
-    """GST rows the way Indian invoices print them: CGST + SGST within a state, IGST across states."""
-    rows = [("Taxable Value" if gst else "Subtotal", money(sub), False)]
+def totals(sub, gst=None, rate=18, ship=None, label_total="Total (INR)", note=None, round_off=False, discount_pct=None):
+    """GST rows the way Indian invoices print them: CGST + SGST within a state, IGST across states.
+    A trade discount is deducted before GST; round_off rounds the payable to the nearest rupee."""
+    rows = []
+    if discount_pct:
+        disc = round(sub * discount_pct / 100, 2)
+        rows += [("Gross Amount", money(sub), False), (f"Less: Trade Discount @ {discount_pct:g}%", money(-disc), False)]
+        sub = round(sub - disc, 2)
+    rows.append(("Taxable Value" if gst else "Subtotal", money(sub), False))
     if ship:
         rows.append(("Shipping", money(ship), False))
     tax = 0.0
@@ -294,7 +300,12 @@ def totals(sub, gst=None, rate=18, ship=None, label_total="Total (INR)", note=No
         rows.append((f"IGST @ {rate:g}%", money(tax), False))
     if note:
         rows.append((note, "-", False))
-    rows.append((label_total, money(round(sub + (ship or 0) + tax, 2)), True))
+    grand = round(sub + (ship or 0) + tax, 2)
+    if round_off:  # Indian invoices often round the payable to the nearest rupee
+        ro = round(round(grand) - grand, 2)
+        rows.append(("Round Off", money(ro), False))
+        grand = float(round(grand))
+    rows.append((label_total, money(grand), True))
     return rows
 
 
@@ -316,7 +327,7 @@ SAMPLES = [
             {"description": "HP 58A Black Toner Cartridge", "qty": 12, "unit_price": 7680.00},
             {"description": "Ergonomic Mesh Office Chair", "qty": 6, "unit_price": 23120.00},
         ],
-        "totals": totals(354080.00, "intra"),
+        "totals": totals(354080.00, "intra", round_off=True),
         "notes": ["Bank: HDFC Bank Ltd.  A/c No. 50200012345417  IFSC HDFC0000523",
                   "2% discount if paid within 10 days of invoice date."],
     },
@@ -444,7 +455,7 @@ SAMPLES = [
         "id": "variant_phone_photo",
         "kind": "Extra input",
         "title": "Phone photo of a paper invoice",
-        "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. It's a 3-way match on a second Sahyadri PO, so it's approved.",
+        "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. The vendor gave a 5% trade discount (₹2,316) before GST and rounded the total up by ₹0.28; both are detected and the maths still reconciles. It's a 3-way match on a second Sahyadri PO, so it's approved.",
         "layout": "modern", "accent": "#0E7C66", "photo": True,
         "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
         "vendor_address": SAHYADRI,
@@ -455,7 +466,7 @@ SAMPLES = [
             {"description": "Tissue rolls - case of 12", "qty": 8, "unit_price": 2520.00},
             {"description": "Disinfectant wipes 80 ct", "qty": 12, "unit_price": 580.00},
         ],
-        "totals": totals(46320.00, "intra"),
+        "totals": totals(46320.00, "intra", round_off=True, discount_pct=5),
         "notes": ["Bank: HDFC Bank Ltd.  A/c No. 50200012345417  IFSC HDFC0000523"],
     },
     {

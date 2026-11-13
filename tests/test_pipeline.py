@@ -242,3 +242,46 @@ def test_reset_clears_runs_and_files_but_keeps_seed_ledger(env):
     assert c["runs"] == 0 and c["files"] == 0 and c["audit"] == 0
     assert len(db.ledger_rows()) == seeded
     assert db.get_policy()["price_tolerance_pct"] == 2.0
+
+
+
+def _truth_run(env, monkeypatch, sid, tweak=None):
+    db, pl = env
+    spec = next(s for s in G.SAMPLES if s["id"] == sid)
+    t = truth(spec)
+    if tweak:
+        tweak(t)
+    monkeypatch.setattr(pl, "llm_available", lambda: True)
+    monkeypatch.setattr(pl, "extract_with_gemini", lambda pdf, text: (t, {"extractor": "truth"}))
+    return run_sync(pl, db, ROOT / "samples" / spec["file"])
+
+
+def _check(r, cid):
+    return next(c for s in r["trace"]["stages"].values() for c in s.get("checks", []) if c["id"] == cid)
+
+
+def test_discount_and_round_off_are_detected(env, monkeypatch):
+    """Photo invoice: 5% trade discount before GST, total rounded up to the rupee. Both detected, maths reconciles, approved."""
+    r = _truth_run(env, monkeypatch, "variant_phone_photo")
+    assert r["decision"] == "APPROVE", r["headline"]
+    d = _check(r, "val.discount")
+    assert d["status"] == "pass" and "₹2,316.00" in d["detail"] and "5.00%" in d["detail"]
+    tot = _check(r, "val.total")
+    assert tot["status"] == "pass" and "rounded off by +₹0.28" in tot["detail"]
+    assert _check(r, "val.tax")["status"] == "pass"  # 18% charged on the discounted value
+    assert "discount" in _check(r, "po.price")["detail"]
+
+
+def test_round_off_without_a_printed_line_and_real_mismatch(env, monkeypatch):
+    def unprinted(t):
+        t["round_off"] = None  # vendor rounded the total but didn't print a round-off row
+    r = _truth_run(env, monkeypatch, "happy_path", unprinted)
+    assert r["decision"] == "APPROVE" and "no round-off line printed" in _check(r, "val.total")["detail"]
+
+
+def test_total_off_by_more_than_a_round_off_is_held(env, monkeypatch):
+    def wrong(t):
+        t["total_amount"] = t["total_amount"] + 7  # ₹7 is not rounding
+        t["round_off"] = None
+    r = _truth_run(env, monkeypatch, "happy_path", wrong)
+    assert r["decision"] == "HOLD" and "more than a round-off" in _check(r, "val.total")["detail"]

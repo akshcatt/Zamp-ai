@@ -1,4 +1,5 @@
 {
+  "_about": "No vendor master. Vendors are learned: anyone we've paid before (payment_history) is known and verified; anyone new is added from their first invoice as unverified and verified once by a person.",
   "company": {
     "legal_name": "Lumen Home Goods Pvt. Ltd.",
     "aliases": [
@@ -10,162 +11,6 @@
     "gstin": "29AAECL4821K1Z3",
     "base_currency": "INR"
   },
-  "vendors": [
-    {
-      "vendor_id": "V-1001",
-      "legal_name": "Sahyadri Office Supplies Pvt. Ltd.",
-      "aliases": [
-        "Sahyadri Office Supplies",
-        "Sahyadri Supplies"
-      ],
-      "tax_id": "29AAKCS3127M1Z6",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "2/10 Net 30",
-      "email_domain": "sahyadrisupplies.in",
-      "phone_on_file": "+91 80 4123 0141",
-      "bank": {
-        "bank_name": "HDFC Bank Ltd.",
-        "ifsc": "HDFC0000523",
-        "account_number": "50200012345417"
-      }
-    },
-    {
-      "vendor_id": "V-1002",
-      "legal_name": "Kaveri Cloud Solutions LLP",
-      "aliases": [
-        "Kaveri Cloud Solutions",
-        "Kaveri Cloud"
-      ],
-      "tax_id": "27AAPFK2210Q1Z9",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "Net 30",
-      "email_domain": "kavericloud.in",
-      "phone_on_file": "+91 20 6712 0178",
-      "bank": {
-        "bank_name": "ICICI Bank Ltd.",
-        "ifsc": "ICIC0001829",
-        "account_number": "182905009188"
-      }
-    },
-    {
-      "vendor_id": "V-1003",
-      "legal_name": "Ganga Freight Carriers Pvt. Ltd.",
-      "aliases": [
-        "Ganga Freight Carriers",
-        "Ganga Freight"
-      ],
-      "tax_id": "27AAGCG4419R1Z2",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "Net 45",
-      "email_domain": "gangafreight.co.in",
-      "phone_on_file": "+91 22 2851 0122",
-      "bank": {
-        "bank_name": "Axis Bank Ltd.",
-        "ifsc": "UTIB0000412",
-        "account_number": "912020044601460"
-      }
-    },
-    {
-      "vendor_id": "V-1004",
-      "legal_name": "Meenakshi Industrial Spares Co.",
-      "aliases": [
-        "Meenakshi Industrial Spares",
-        "Meenakshi Spares"
-      ],
-      "tax_id": "33AAHFM3098P1Z4",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "Net 30",
-      "email_domain": "meenakshispares.com",
-      "phone_on_file": "+91 44 2625 0190",
-      "bank": {
-        "bank_name": "State Bank of India",
-        "ifsc": "SBIN0000800",
-        "account_number": "38410287736"
-      }
-    },
-    {
-      "vendor_id": "V-1005",
-      "legal_name": "Kesari Facility Services Pvt. Ltd.",
-      "aliases": [
-        "Kesari Facility Services",
-        "Kesari FS",
-        "Kesari Facilities"
-      ],
-      "tax_id": "29AAJCK5582N1Z8",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "Net 30",
-      "email_domain": "kesarifacility.in",
-      "phone_on_file": "+91 80 4718 0163",
-      "bank": {
-        "bank_name": "Kotak Mahindra Bank Ltd.",
-        "ifsc": "KKBK0008066",
-        "account_number": "4031557781"
-      }
-    },
-    {
-      "vendor_id": "V-1006",
-      "legal_name": "Pragati Print & Packaging",
-      "aliases": [
-        "Pragati Print and Packaging",
-        "Pragati Packaging",
-        "Pragati Print"
-      ],
-      "tax_id": "29ABBFP3374E1Z1",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "Net 30",
-      "email_domain": "pragatiprint.in",
-      "phone_on_file": "+91 80 2837 0137",
-      "bank": {
-        "bank_name": "Canara Bank",
-        "ifsc": "CNRB0002611",
-        "account_number": "2611201019934"
-      }
-    },
-    {
-      "vendor_id": "V-1007",
-      "legal_name": "Annapurna Caterers",
-      "aliases": [
-        "Annapurna Catering",
-        "Annapurna Events & Caterers"
-      ],
-      "tax_id": "29AQRPA4471H1Z5",
-      "status": "active",
-      "currency": "INR",
-      "payment_terms": "Net 15",
-      "email_domain": "annapurnacaterers.in",
-      "phone_on_file": "+91 98450 10119",
-      "bank": {
-        "bank_name": "Bank of Baroda",
-        "ifsc": "BARB0INDIRA",
-        "account_number": "48300200021175"
-      }
-    },
-    {
-      "vendor_id": "V-1008",
-      "legal_name": "Vajra Tooling Works",
-      "aliases": [
-        "Vajra Tooling"
-      ],
-      "tax_id": "29AAKFV2290C1Z0",
-      "status": "blocked",
-      "status_reason": "Failed annual compliance review (sanctions screening), 2026-09-30",
-      "currency": "INR",
-      "payment_terms": "Net 30",
-      "email_domain": "vajratooling.in",
-      "phone_on_file": "+91 80 2839 0104",
-      "bank": {
-        "bank_name": "Yes Bank Ltd.",
-        "ifsc": "YESB0000118",
-        "account_number": "011863400003347"
-      }
-    }
-  ],
   "purchase_orders": [
     {
       "po_number": "PO-2026-0311",
@@ -202,7 +47,8 @@
           "unit_price": 23120.0,
           "gl_account": "6150 Furniture (expensed)"
         }
-      ]
+      ],
+      "vendor_gstin": "29AAKCS3127M1Z6"
     },
     {
       "po_number": "PO-2026-0287",
@@ -223,7 +69,8 @@
           "unit_price": 12000.0,
           "gl_account": "6420 Professional Services"
         }
-      ]
+      ],
+      "vendor_gstin": "27AAPFK2210Q1Z9"
     },
     {
       "po_number": "PO-2026-0342",
@@ -260,7 +107,8 @@
           "unit_price": 6800.0,
           "gl_account": "5300 Freight Out"
         }
-      ]
+      ],
+      "vendor_gstin": "27AAGCG4419R1Z2"
     },
     {
       "po_number": "PO-2026-0298",
@@ -281,7 +129,8 @@
           "unit_price": 160000.0,
           "gl_account": "5350 Warehousing"
         }
-      ]
+      ],
+      "vendor_gstin": "27AAGCG4419R1Z2"
     },
     {
       "po_number": "PO-2026-0275",
@@ -318,7 +167,8 @@
           "unit_price": 940.0,
           "gl_account": "6600 Repairs & Maintenance"
         }
-      ]
+      ],
+      "vendor_gstin": "33AAHFM3098P1Z4"
     },
     {
       "po_number": "PO-2026-0330",
@@ -347,7 +197,8 @@
           "unit_price": 96000.0,
           "gl_account": "6300 Facilities"
         }
-      ]
+      ],
+      "vendor_gstin": "29AAJCK5582N1Z8"
     },
     {
       "po_number": "PO-2026-0356",
@@ -376,7 +227,8 @@
           "unit_price": 3360.0,
           "gl_account": "5200 Packaging"
         }
-      ]
+      ],
+      "vendor_gstin": "29ABBFP3374E1Z1"
     },
     {
       "po_number": "PO-2026-0361",
@@ -397,7 +249,8 @@
           "unit_price": 276000.0,
           "gl_account": "6700 Events"
         }
-      ]
+      ],
+      "vendor_gstin": "29AQRPA4471H1Z5"
     },
     {
       "po_number": "PO-2026-0368",
@@ -434,7 +287,8 @@
           "unit_price": 580.0,
           "gl_account": "6120 Breakroom"
         }
-      ]
+      ],
+      "vendor_gstin": "29AAKCS3127M1Z6"
     }
   ],
   "goods_receipts": [
@@ -537,7 +391,7 @@
       "grn": "GRN-88140"
     }
   ],
-  "invoice_ledger": [
+  "payment_history": [
     {
       "vendor_id": "V-1002",
       "invoice_number": "KCS-INV-1182",
@@ -548,7 +402,21 @@
       "status": "paid",
       "posted_at": "2026-10-02",
       "payment_ref": "UTR-77104",
-      "note": "200 hrs @ Rs. 12,000, September"
+      "note": "200 hrs @ Rs. 12,000, September",
+      "vendor_name": "Kaveri Cloud Solutions LLP",
+      "aliases": [
+        "Kaveri Cloud Solutions",
+        "Kaveri Cloud"
+      ],
+      "gstin": "27AAPFK2210Q1Z9",
+      "email_domain": "kavericloud.in",
+      "phone": "+91 20 6712 0178",
+      "payment_terms": "Net 30",
+      "paid_to": {
+        "bank_name": "ICICI Bank Ltd.",
+        "ifsc": "ICIC0001829",
+        "account_number": "182905009188"
+      }
     },
     {
       "vendor_id": "V-1004",
@@ -560,7 +428,21 @@
       "status": "paid",
       "posted_at": "2026-10-14",
       "payment_ref": "UTR-77812",
-      "note": "Full PO billed"
+      "note": "Full PO billed",
+      "vendor_name": "Meenakshi Industrial Spares Co.",
+      "aliases": [
+        "Meenakshi Industrial Spares",
+        "Meenakshi Spares"
+      ],
+      "gstin": "33AAHFM3098P1Z4",
+      "email_domain": "meenakshispares.com",
+      "phone": "+91 44 2625 0190",
+      "payment_terms": "Net 30",
+      "paid_to": {
+        "bank_name": "State Bank of India",
+        "ifsc": "SBIN0000800",
+        "account_number": "38410287736"
+      }
     },
     {
       "vendor_id": "V-1003",
@@ -572,7 +454,127 @@
       "status": "posted",
       "posted_at": "2026-11-03",
       "payment_ref": null,
-      "note": "October storage"
+      "note": "October storage",
+      "vendor_name": "Ganga Freight Carriers Pvt. Ltd.",
+      "aliases": [
+        "Ganga Freight Carriers",
+        "Ganga Freight"
+      ],
+      "gstin": "27AAGCG4419R1Z2",
+      "email_domain": "gangafreight.co.in",
+      "phone": "+91 22 2851 0122",
+      "payment_terms": "Net 45",
+      "paid_to": {
+        "bank_name": "Axis Bank Ltd.",
+        "ifsc": "UTIB0000412",
+        "account_number": "912020044601460"
+      }
+    },
+    {
+      "vendor_id": "V-1001",
+      "invoice_number": "SOS/26-27/57102",
+      "invoice_date": "2026-09-14",
+      "net_amount": 98400.0,
+      "total_amount": 116112.0,
+      "po_number": null,
+      "status": "paid",
+      "posted_at": "2026-09-14",
+      "payment_ref": "UTR-76310",
+      "note": "Pantry supplies, September",
+      "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
+      "aliases": [
+        "Sahyadri Office Supplies",
+        "Sahyadri Supplies"
+      ],
+      "gstin": "29AAKCS3127M1Z6",
+      "email_domain": "sahyadrisupplies.in",
+      "phone": "+91 80 4123 0141",
+      "payment_terms": "2/10 Net 30",
+      "paid_to": {
+        "bank_name": "HDFC Bank Ltd.",
+        "ifsc": "HDFC0000523",
+        "account_number": "50200012345417"
+      }
+    },
+    {
+      "vendor_id": "V-1005",
+      "invoice_number": "KFS-2026-0981",
+      "invoice_date": "2026-10-03",
+      "net_amount": 628000.0,
+      "total_amount": 741040.0,
+      "po_number": null,
+      "status": "paid",
+      "posted_at": "2026-10-03",
+      "payment_ref": "UTR-77021",
+      "note": "Housekeeping, October",
+      "vendor_name": "Kesari Facility Services Pvt. Ltd.",
+      "aliases": [
+        "Kesari Facility Services",
+        "Kesari FS",
+        "Kesari Facilities"
+      ],
+      "gstin": "29AAJCK5582N1Z8",
+      "email_domain": "kesarifacility.in",
+      "phone": "+91 80 4718 0163",
+      "payment_terms": "Net 30",
+      "paid_to": {
+        "bank_name": "Kotak Mahindra Bank Ltd.",
+        "ifsc": "KKBK0008066",
+        "account_number": "4031557781"
+      }
+    },
+    {
+      "vendor_id": "V-1006",
+      "invoice_number": "PPP-7519",
+      "invoice_date": "2026-08-21",
+      "net_amount": 212000.0,
+      "total_amount": 250160.0,
+      "po_number": null,
+      "status": "paid",
+      "posted_at": "2026-08-21",
+      "payment_ref": "UTR-75544",
+      "note": "Festive packaging run",
+      "vendor_name": "Pragati Print & Packaging",
+      "aliases": [
+        "Pragati Print and Packaging",
+        "Pragati Packaging",
+        "Pragati Print"
+      ],
+      "gstin": "29ABBFP3374E1Z1",
+      "email_domain": "pragatiprint.in",
+      "phone": "+91 80 2837 0137",
+      "payment_terms": "Net 30",
+      "paid_to": {
+        "bank_name": "Canara Bank",
+        "ifsc": "CNRB0002611",
+        "account_number": "2611201019934"
+      }
+    },
+    {
+      "vendor_id": "V-1007",
+      "invoice_number": "AC/2026/118",
+      "invoice_date": "2026-07-30",
+      "net_amount": 96000.0,
+      "total_amount": 100800.0,
+      "po_number": null,
+      "status": "paid",
+      "posted_at": "2026-07-30",
+      "payment_ref": "UTR-74102",
+      "note": "Q2 offsite lunch",
+      "vendor_name": "Annapurna Caterers",
+      "aliases": [
+        "Annapurna Catering",
+        "Annapurna Events & Caterers"
+      ],
+      "gstin": "29AQRPA4471H1Z5",
+      "email_domain": "annapurnacaterers.in",
+      "phone": "+91 98450 10119",
+      "payment_terms": "Net 15",
+      "paid_to": {
+        "bank_name": "Bank of Baroda",
+        "ifsc": "BARB0INDIRA",
+        "account_number": "48300200021175"
+      }
     }
   ]
 }

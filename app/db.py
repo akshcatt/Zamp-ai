@@ -29,6 +29,7 @@ DEFAULT_POLICY = {
     "price_tolerance_pct": 2.0,          # max variance vs PO, percent ...
     "price_tolerance_abs": 40000.0,      # ... and absolute rupees; the tighter of the two applies
     "arithmetic_tolerance": 0.05,        # rounding slack on sums
+    "round_off_max": 1.0,                # Rs.: totals rounded off to the nearest rupee are accepted up to this
     "high_value_threshold": 2500000.0,   # Rs. 25 lakh: above this a controller signs off, even if matched
     "inferred_po_auto_approve": True,    # may an inferred (not quoted) PO be auto-approved?
     "inferred_po_min_confidence": 0.85,
@@ -94,6 +95,11 @@ def _schema() -> list[str]:
         "CREATE TABLE IF NOT EXISTS policy (key TEXT PRIMARY KEY, value TEXT)",
         "CREATE TABLE IF NOT EXISTS extraction_cache (sha256 TEXT PRIMARY KEY, extractor TEXT, data_json TEXT, created_at TEXT)",
         f"CREATE TABLE IF NOT EXISTS files (run_id TEXT PRIMARY KEY, mime TEXT, data {blob}, created_at TEXT)",
+        # Vendors are learned, not loaded from a master file: from the payment history, or from a new vendor's first invoice.
+        """CREATE TABLE IF NOT EXISTS vendors (
+          vendor_id TEXT PRIMARY KEY, legal_name TEXT, aliases_json TEXT, gstin TEXT, email_domain TEXT, phone TEXT,
+          bank_name TEXT, ifsc TEXT, account_number TEXT, payment_terms TEXT, status TEXT, status_reason TEXT,
+          source TEXT, first_run_id TEXT, created_at TEXT, verified_at TEXT, verified_by TEXT)""",
         "CREATE INDEX IF NOT EXISTS runs_created ON runs (created_at)",
         "CREATE INDEX IF NOT EXISTS runs_sha ON runs (sha256)",
         "CREATE INDEX IF NOT EXISTS ledger_po ON ledger (po_number)",
@@ -108,15 +114,25 @@ def master() -> dict:
 def init(reset: bool = False) -> None:
     with _lock:
         if reset:
-            for t in ("runs", "ledger", "audit", "policy", "files"):
+            for t in ("runs", "ledger", "audit", "policy", "files", "vendors"):
                 q(f"DROP TABLE IF EXISTS {t}")
         for stmt in _schema():
             q(stmt)
         # additive migration for databases created before archiving existed
         if "archived_at" not in {c["name"] for c in q("PRAGMA table_info(runs)", fetch="all")}:
             q("ALTER TABLE runs ADD COLUMN archived_at TEXT")
+        seed = master()
+        if q("SELECT COUNT(*) AS n FROM vendors", fetch="one")["n"] == 0:
+            for e in seed["payment_history"]:  # anyone we've already paid is a known, verified vendor
+                if not vendor_get(e["vendor_id"]):
+                    b = e["paid_to"]
+                    q("INSERT INTO vendors (vendor_id, legal_name, aliases_json, gstin, email_domain, phone, bank_name, ifsc, account_number,"
+                      " payment_terms, status, source, created_at, verified_at, verified_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                      (e["vendor_id"], e["vendor_name"], json.dumps(e.get("aliases") or []), e["gstin"], e["email_domain"], e["phone"],
+                       b["bank_name"], b["ifsc"], b["account_number"], e["payment_terms"], "active", "payment history",
+                       e["posted_at"], e["posted_at"], "payment history"))
         if q("SELECT COUNT(*) AS n FROM ledger", fetch="one")["n"] == 0:
-            for e in master()["invoice_ledger"]:
+            for e in seed["payment_history"]:
                 q("INSERT INTO ledger (vendor_id, invoice_number, invoice_number_norm, invoice_date, net_amount, total_amount,"
                   " po_number, status, posted_at, payment_ref, note, source_run_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                   (e["vendor_id"], e["invoice_number"], norm_invoice_no(e["invoice_number"]), e["invoice_date"],
@@ -124,6 +140,70 @@ def init(reset: bool = False) -> None:
                    e.get("note"), "seed"))
         for k, v in DEFAULT_POLICY.items():
             q("INSERT INTO policy (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING", (k, json.dumps(v)))
+
+
+# ---------------------------------------------------------------- vendors (learned, no master file)
+def _vendor(r: dict | None) -> dict | None:
+    """Row -> the shape the rules engine uses."""
+    if not r:
+        return None
+    return {"vendor_id": r["vendor_id"], "legal_name": r["legal_name"], "aliases": json.loads(r["aliases_json"] or "[]"),
+            "tax_id": r["gstin"] or "", "email_domain": r["email_domain"] or "", "phone_on_file": r["phone"],
+            "bank": {"bank_name": r["bank_name"], "ifsc": r["ifsc"] or "", "account_number": r["account_number"] or ""},
+            "payment_terms": r["payment_terms"] or "Net 30", "status": r["status"], "status_reason": r["status_reason"],
+            "source": r["source"], "first_run_id": r["first_run_id"], "created_at": r["created_at"],
+            "verified_at": r["verified_at"], "verified_by": r["verified_by"]}
+
+
+def vendors_all() -> list[dict]:
+    return [_vendor(r) for r in q("SELECT * FROM vendors ORDER BY vendor_id", fetch="all")]
+
+
+def vendor_get(vendor_id: str) -> dict | None:
+    return _vendor(q("SELECT * FROM vendors WHERE vendor_id = ?", (vendor_id,), fetch="one"))
+
+
+def vendor_add_from_invoice(inv: dict, run_id: str) -> dict:
+    """First invoice from someone new: add them as 'unverified' using what the invoice says. The details become the
+    reference for later invoices, but nothing is paid until a person verifies the vendor once."""
+    gstin = re.sub(r"\s", "", (inv.get("vendor_tax_id") or "")).upper() or None
+    name = (inv.get("vendor_name") or "").strip() or "Unnamed vendor"
+    with _lock:  # a batch can carry two invoices from the same new vendor: add them once
+        if gstin:
+            hit = q("SELECT * FROM vendors WHERE gstin = ?", (gstin,), fetch="one")
+            if hit:
+                return _vendor(hit)
+        hit = q("SELECT * FROM vendors WHERE lower(legal_name) = lower(?)", (name,), fetch="one")
+        if hit:
+            return _vendor(hit)
+        n = max([int(r["vendor_id"].split("-")[1]) for r in q("SELECT vendor_id FROM vendors", fetch="all")] or [1000]) + 1
+        vid = f"V-{n}"
+        bank = inv.get("bank_details") or {}
+        email = (inv.get("vendor_email") or "")
+        q("INSERT INTO vendors (vendor_id, legal_name, aliases_json, gstin, email_domain, phone, bank_name, ifsc, account_number,"
+          " payment_terms, status, source, first_run_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          (vid, name, "[]", gstin, email.split("@")[-1].lower() if "@" in email else None, inv.get("vendor_phone"),
+           bank.get("bank_name"), (bank.get("ifsc") or "").upper() or None, bank.get("account_number"),
+           inv.get("payment_terms"), "unverified", "first invoice", run_id, now_iso()))
+        add_audit(run_id, "system", "vendor_added", f"New vendor {vid} {name} added from this invoice, unverified.")
+        return vendor_get(vid)
+
+
+def vendor_set_status(vendor_id: str, status: str, actor: str, reason: str = "") -> dict:
+    if status not in ("active", "blocked"):
+        raise ValueError("status must be active or blocked")
+    v = vendor_get(vendor_id)
+    if not v:
+        raise ValueError("vendor not found")
+    if status == "active" and v["status"] == "unverified":
+        q("UPDATE vendors SET status = 'active', status_reason = NULL, verified_at = ?, verified_by = ? WHERE vendor_id = ?",
+          (now_iso(), actor, vendor_id))
+    else:
+        q("UPDATE vendors SET status = ?, status_reason = ? WHERE vendor_id = ?", (status, reason or None, vendor_id))
+    if v.get("first_run_id"):
+        add_audit(v["first_run_id"], actor, {"active": "vendor_verified" if v["status"] == "unverified" else "vendor_unblocked",
+                                              "blocked": "vendor_blocked"}[status], f"{vendor_id} {v['legal_name']}: {reason or status}")
+    return vendor_get(vendor_id)
 
 
 def ping() -> bool:

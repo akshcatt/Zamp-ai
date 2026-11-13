@@ -15,7 +15,7 @@
     "kind": "Edge case 1",
     "title": "Split billing pushes PO over its cap",
     "vendor": "Kaveri Cloud Solutions LLP",
-    "what_to_expect": "On hold for the buyer. This invoice alone looks fine, but combined with the ₹24,00,000 already billed it overruns the 320-hour PO by ₹3,00,000 (7.8%). The process suggests a partial approval of ₹14,40,000.",
+    "what_to_expect": "On hold for the buyer. This invoice alone looks fine, but combined with the \u20b924,00,000 already billed it overruns the 320-hour PO by \u20b93,00,000 (7.8%). The process suggests a partial approval of \u20b914,40,000.",
     "scanned": false,
     "photo": false
   },
@@ -55,7 +55,7 @@
     "kind": "Extra input",
     "title": "Close but not exact: unbudgeted freight",
     "vendor": "Pragati Print & Packaging",
-    "what_to_expect": "Approved with a note. The vendor added a ₹3,600 freight line that isn't on the PO. That's +0.78%, inside the 2% / ₹40,000 tolerance, so it passes without a human touch and the variance is logged.",
+    "what_to_expect": "Approved with a note. The vendor added a \u20b93,600 freight line that isn't on the PO. That's +0.78%, inside the 2% / \u20b940,000 tolerance, so it passes without a human touch and the variance is logged.",
     "scanned": false,
     "photo": false
   },
@@ -75,7 +75,7 @@
     "kind": "Extra input",
     "title": "Phone photo of a paper invoice",
     "vendor": "Sahyadri Office Supplies Pvt. Ltd.",
-    "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. It's a 3-way match on a second Sahyadri PO, so it's approved.",
+    "what_to_expect": "A JPEG photo, not a PDF: tilted, on a desk, uneven light. Intake detects the file type from its bytes, auto-rotates the photo and converts it to a PDF, then Gemini reads it like a scan. The vendor gave a 5% trade discount (\u20b92,316) before GST and rounded the total up by \u20b90.28; both are detected and the maths still reconciles. It's a 3-way match on a second Sahyadri PO, so it's approved.",
     "scanned": false,
     "photo": true
   },

@@ -29,7 +29,7 @@ So the build optimises for two things:
 | 2 | Document analysis | PDF → text layer + page stats | Scanned (no text) → vision path, grounding check off |
 | 3 | AI extraction | PDF → strict-schema JSON + per-field confidence | API down → cached extraction → heuristic parser → manual keying |
 | 4 | Validation | Fields → checks | Missing invoice #/date → return to vendor; math/tax/date/confidence/grounding issue → AP |
-| 5 | Vendor verification | Fields + vendor master → matched vendor | Unknown → Vendor Mgmt; blocked → reject; bank/domain/change-notice → Treasury & Fraud |
+| 5 | Vendor verification | Fields + learned vendor list → matched vendor | New vendor → added as unverified from this invoice, held once for Vendor Mgmt; blocked → reject; bank/domain/change-notice → Treasury & Fraud |
 | 6 | Duplicate detection | Fields + ledger + queue → checks | Same normalised # and amount → reject; same # with a different amount, or same amount near the same date → AP |
 | 7 | PO & receipt matching | Fields + POs + receipts + ledger → match | PO quoted or inferred; price/qty variance vs tolerance; goods received; cumulative vs PO cap; controller threshold |
 | 8 | Decision | All checks → decision | any reject → **REJECT**; any hold → **HOLD** to the highest-priority owner; else **APPROVE** + post + schedule payment |
@@ -62,11 +62,11 @@ I picked edge cases that test **judgment and context**, not parsing tricks:
    Line matching deliberately weights structured signals (exact unit price, quantity within PO) over wording, because "LTL Freight CHI → CMH" and "LTL freight, Chicago IL to Columbus OH" share almost no words.
 3. **Disguised duplicate (Meenakshi).** The most common way AP pays twice: the vendor re-sends a "second notice" with the number written differently. The file hash differs, so naive dedup fails. Normalising invoice numbers (`INV 2026/0417` = `INV-2026-0417` = `INV20260417`) plus vendor plus amount catches it, and the explanation cites the original payment reference. The process also checks the review queue, so the same invoice can't be in review twice.
 4. **Bank-detail change (Kesari).** Business email compromise is the single most costly AP fraud. It's interesting because **every financial check passes**. Three independent signals fire:
-   - the remit-to account differs from the vendor master;
+   - the remit-to account differs from the verified account on file;
    - the invoice text announces a "new bank";
    - the sender uses a look-alike domain (`keystone-fm-billing.com` vs `keystonefm.com`).
 
-   The output is a hold for Treasury, an internal task to **call back on the phone number in the vendor master**, and an explicit "do not reply to the invoice's email". Payments only ever go to the master-file account. That's a control, not a check.
+   The output is a hold for Treasury, an internal task to **call back on the phone number on file**, and an explicit "do not reply to the invoice's email". Payments only ever go to the verified account on file-file account. That's a control, not a check.
 
 Three extra inputs show the "close but not exact", "communicate back" and "it isn't even a PDF" behaviours. Pragati has ₹3,600 of freight within tolerance, so it's approved with a note. Annapurna has no invoice number or date, so it's returned to the vendor with a drafted email. The Sahyadri phone photo (a JPEG of a printed invoice, tilted on a desk) is normalised to a PDF at intake, so every later stage sees one input type, and it's read like a scan.
 
@@ -93,9 +93,24 @@ Three extra inputs show the "close but not exact", "communicate back" and "it is
 ## 7. What I'd build next
 
 1. **Email intake.** An AP inbox webhook, split multi-invoice PDFs, attach to the run.
-2. **ERP connectors.** Read POs, GRNs and the vendor master live, and post approved invoices back.
+2. **ERP connectors.** Read POs and GRNs live, and sync the learned vendor list with the ERP's vendor records, and post approved invoices back.
 3. **Credit notes and statements.** They're classified today but parked; next is to match them against open items.
 4. **Multi-currency and VAT/GST**, including tax-ID format validation per country.
 5. **Learning from reviewers.** Track override reasons per rule to tune tolerances, while keeping the rules deterministic.
 6. **Eval set.** Fifty or more real-world invoices with labelled fields, to measure extraction accuracy per field and per model or effort level, and to catch regressions.
 7. **Segregation of duties.** Role-based approvals: the person who releases a fraud hold can't be the one who changed the bank details.
+
+## Vendors without a master file
+
+There is no vendor master to load or maintain. Vendors are learned:
+
+- **Payment history.** Anyone we've already paid is known and verified; the account we paid is their reference bank account.
+- **First invoice.** A vendor we've never seen is added automatically from the invoice (name, GSTIN, email domain, bank, IFSC) with status *unverified*. That first invoice is held for Vendor Management, never auto-paid: auto-trusting a new payee is exactly how fake-vendor fraud works.
+- **Verify once.** A person checks the GSTIN on the GST portal and confirms the bank (cancelled cheque or a call to a known contact), then clicks *Verify vendor*. Their waiting invoices are re-checked against every rule, and their details become the reference, so a later "we've changed banks" invoice is still caught.
+- **Purchase orders** name the vendor by ID and GSTIN, so a learned vendor is matched to POs raised for them.
+
+## Discounts and round-offs
+
+- A discount row in the totals ("Less: Trade Discount @ 5%") is read as `discount_amount`; totals must reconcile as subtotal − discount + GST + shipping, the GST slab is checked on the discounted value, and a PO match notes that the lines match before the discount.
+- Indian invoices round the payable to the nearest rupee. A total that differs from the computed amount by up to `round_off_max` (₹1) is accepted when a Round Off row explains it or the total is a whole rupee; anything larger is held as a real mismatch.
+- Repeat-invoice amount matching uses the same ₹1 tolerance.

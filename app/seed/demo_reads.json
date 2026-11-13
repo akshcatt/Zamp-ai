@@ -1,7 +1,7 @@
 [
  {
   "file": "01_happy_sahyadri_SOS-58213.pdf",
-  "sha256": "259d8ff649c2d99861604bb046ab08a3700136f1a331d55c90b89b3d537ae6de",
+  "sha256": "602698784bddd078864cdb3c0cf246752e0b53c2fcb1ae6715bbed5b213514c0",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -38,10 +38,12 @@
     }
    ],
    "subtotal": 354080.0,
+   "discount_amount": null,
    "tax_amount": 63734.4,
-   "tax_rate_pct": 18,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
-   "total_amount": 417814.4,
+   "round_off": -0.4,
+   "total_amount": 417814.0,
    "tax_inclusive": false,
    "bank_details": {
     "bank_name": "HDFC Bank Ltd.",
@@ -65,7 +67,7 @@
  },
  {
   "file": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
-  "sha256": "ea77b9f99be4b42c5efe33c46111e8f290a780e2c0c8af13e54e70c59b0d233d",
+  "sha256": "813973bbacdd5c3be8e0a0d0475a2f4a6b9a220e66cb7e293d91dec9c971ecc1",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -90,9 +92,11 @@
     }
    ],
    "subtotal": 1740000.0,
+   "discount_amount": null,
    "tax_amount": 313200.0,
    "tax_rate_pct": 18.0,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 2053200.0,
    "tax_inclusive": false,
    "bank_details": {
@@ -117,7 +121,7 @@
  },
  {
   "file": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
-  "sha256": "ad729275d326f83939cd3b86b2527ca28de92f5a2f1b4cac8ec6710f6699560e",
+  "sha256": "e7aa080fad2ddfbaef6396e2f5197ea940bc8e3c19b785de66aed4d4abdc250d",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -135,7 +139,7 @@
    "currency": "INR",
    "line_items": [
     {
-     "description": "PTL Freight BHW -> PNQ (LR 88213, 88219, 88227)",
+     "description": "PTL Freight BHW -> PNQ (LR 88213; 88219, 88227)",
      "quantity": 3,
      "unit_price": 99200.0,
      "amount": 297600.0
@@ -154,9 +158,11 @@
     }
    ],
    "subtotal": 341808.0,
+   "discount_amount": null,
    "tax_amount": null,
    "tax_rate_pct": null,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 341808.0,
    "tax_inclusive": false,
    "bank_details": {
@@ -166,7 +172,7 @@
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": null,
+   "payment_instruction_notes": "Bank: Axis Bank Ltd. A/c No. 912020044601460 IFSC UTIB0000412",
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -183,7 +189,7 @@
  },
  {
   "file": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
-  "sha256": "97bdf128a7e722b63f35ecc24ef40086c4b77d3dfda4052481cde5fd0f8f855c",
+  "sha256": "bb1f8d3cbbecd97e4e3a62af09b96dc0c104237adcbc1de84063115b4a0c422b",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -220,9 +226,11 @@
     }
    ],
    "subtotal": 480800.0,
+   "discount_amount": null,
    "tax_amount": 86544.0,
-   "tax_rate_pct": 18.0,
+   "tax_rate_pct": 18,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 567344.0,
    "tax_inclusive": false,
    "bank_details": {
@@ -243,13 +251,13 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "Document contains a stamp saying 'SECOND NOTICE'."
+    "Document contains a 'SECOND NOTICE' stamp."
    ]
   }
  },
  {
   "file": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
-  "sha256": "e1083bfd3d1f52770c40acbc2d3f1876108392807d82450e2bbc3286145ac759",
+  "sha256": "b160c1327a937497eae6638fbfb4bf5854b8fb7df4ac9e26c0eff4c4d3472560",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -261,7 +269,7 @@
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
    "invoice_number": "KFS-2026-1147",
    "invoice_date": "2026-11-03",
-   "due_date": "2026-12-03",
+   "due_date": null,
    "po_reference": "PO-2026-0330",
    "payment_terms": "Net 30",
    "currency": "INR",
@@ -280,9 +288,11 @@
     }
    ],
    "subtotal": 724000.0,
+   "discount_amount": null,
    "tax_amount": 130320.0,
    "tax_rate_pct": 18.0,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 854320.0,
    "tax_inclusive": false,
    "bank_details": {
@@ -307,7 +317,7 @@
  },
  {
   "file": "06_variant_tolerance_pragati_PPP-7734.pdf",
-  "sha256": "23322fc54f1aa4e4de3a1c34e51a024ee9f3d0706f2e3a6887c283dbee4bf671",
+  "sha256": "3306b4be69232ee05324c893a5dbccd3e0f0e3d80bb14549dcdec0d790574e35",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -344,9 +354,11 @@
     }
    ],
    "subtotal": 467600.0,
+   "discount_amount": null,
    "tax_amount": 84168.0,
    "tax_rate_pct": 18.0,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 551768.0,
    "tax_inclusive": false,
    "bank_details": {
@@ -371,7 +383,7 @@
  },
  {
   "file": "07_variant_missing_fields_annapurna.pdf",
-  "sha256": "dc3216220bf2472b6d04c0df2a703d11beaa74e95131c95ea023f0b451d51952",
+  "sha256": "c2aec724bc74cdecb4a09fe04eeabbaba176b0730ad2f8473720c5a97cccf092",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -396,9 +408,11 @@
     }
    ],
    "subtotal": 276000.0,
+   "discount_amount": null,
    "tax_amount": 13800.0,
    "tax_rate_pct": 5.0,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 289800.0,
    "tax_inclusive": false,
    "bank_details": {
@@ -419,14 +433,14 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "Invoice number is not present on the document.",
-    "Invoice date is not present on the document."
+    "Invoice number is missing from the document.",
+    "Invoice date is missing from the document."
    ]
   }
  },
  {
   "file": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
-  "sha256": "6167e67e54d5594a97009ed5982101cdb3840902f5b82d63344b00655e8965c3",
+  "sha256": "f97b791ec3ed21afe4fd25493034b8bad4fa6f46cf2ebfa79eb1fa255a8cbf01",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -463,10 +477,12 @@
     }
    ],
    "subtotal": 46320.0,
-   "tax_amount": 8337.6,
+   "discount_amount": 2316.0,
+   "tax_amount": 7920.72,
    "tax_rate_pct": 18.0,
    "shipping_amount": null,
-   "total_amount": 54657.6,
+   "round_off": 0.28,
+   "total_amount": 51925.0,
    "tax_inclusive": false,
    "bank_details": {
     "bank_name": "HDFC Bank Ltd.",
@@ -490,7 +506,7 @@
  },
  {
   "file": "09_variant_quote_pragati_Q-2291.pdf",
-  "sha256": "ac1e1dedd007c2c76fa2715f53a8b00d4704de1473f9e2902fb621832066d899",
+  "sha256": "c42ff6c14a341e351e795ed860f718009b15f520bd73a937d860a38939762068",
   "extractor": "gemini",
   "data": {
    "document_type": "quote",
@@ -521,9 +537,11 @@
     }
    ],
    "subtotal": 396000.0,
+   "discount_amount": null,
    "tax_amount": null,
    "tax_rate_pct": null,
    "shipping_amount": null,
+   "round_off": null,
    "total_amount": 396000.0,
    "tax_inclusive": false,
    "bank_details": {

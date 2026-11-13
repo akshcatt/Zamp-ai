@@ -285,8 +285,10 @@ class Rekey(BaseModel):
     currency: str | None = Field("INR", max_length=8)
     vendor_email: str | None = Field(None, max_length=200)
     subtotal: float | None = None
+    discount_amount: float | None = None
     tax_amount: float | None = None
     shipping_amount: float | None = None
+    round_off: float | None = None
     total_amount: float | None = None
     line_items: list[LineIn] = Field(default_factory=list, max_length=200)
 
@@ -421,25 +423,26 @@ def analytics():
 
 @app.get("/api/vendors")
 def vendors():
-    """Vendor profiles: master data joined with everything the process has seen from each vendor."""
+    """Vendor profiles: the learned vendor list joined with everything the process has seen from each vendor."""
     m = db.master()
     rs = [r for r in db.list_runs(10000, archived=None) if r["status"] != "running" and is_invoice_run(r)]
     ledger = db.ledger_rows()
     out = []
-    for v in m["vendors"]:
+    for v in db.vendors_all():
         mine = [r for r in rs if r["vendor_id"] == v["vendor_id"]]
-        pos = [p for p in m["purchase_orders"] if p["vendor_id"] == v["vendor_id"]]
+        pos = [p for p in m["purchase_orders"] if pipeline._po_is_vendors(p, v)]
         open_balance = sum(pipeline._po_state(p)["remaining"] for p in pos if p["status"] == "open")
         flags = []
-        if v["status"] != "active":
-            flags.append("Blocked in vendor master")
+        if v["status"] == "blocked":
+            flags.append("Blocked for payment")
+        if v["status"] == "unverified":
+            flags.append("New vendor: needs verification")
         if any(r["route_to"] == "Treasury & Fraud" for r in mine):
             flags.append("Bank-change attempt seen")
         if any((r["route_to"] or "").startswith("Rejected: duplicate") for r in mine):
             flags.append("Sent a repeat invoice")
         out.append({
-            "vendor_id": v["vendor_id"], "name": v["legal_name"], "status": v["status"], "terms": v["payment_terms"],
-            "email_domain": v["email_domain"], "bank": f"{v['bank']['bank_name']} ••••{v['bank']['account_number'][-4:]}",
+            **_vendor_row(v), "name": v["legal_name"], "terms": v["payment_terms"],
             "invoices": len(mine), "approved": sum(_final(r) == "APPROVE" for r in mine),
             "waiting": sum(r["decision"] == "HOLD" and (r["review_status"] or "pending") == "pending" for r in mine),
             "rejected": sum(_final(r) == "REJECT" for r in mine),
@@ -569,16 +572,63 @@ def benchmark():
 @app.get("/api/reference")
 def reference():
     m = db.master()
+    names = {v["vendor_id"]: v["legal_name"] for v in db.vendors_all()}
     pos = []
     for p in m["purchase_orders"]:
         st = pipeline._po_state(p)
-        vendor = next(v for v in m["vendors"] if v["vendor_id"] == p["vendor_id"])
         pos.append({**{k: p[k] for k in ("po_number", "vendor_id", "status", "buyer", "description", "receipt_required", "cost_center")},
-                    "vendor": vendor["legal_name"], "lines": p["lines"], **{k: v for k, v in st.items() if k != "prior_invoices"}})
-    vendors_ = [{**{k: v[k] for k in ("vendor_id", "legal_name", "tax_id", "status", "payment_terms", "email_domain", "phone_on_file")},
-                 "bank": f"{v['bank']['bank_name']} ••••{v['bank']['account_number'][-4:]}"} for v in m["vendors"]]
-    return {"company": m["company"], "vendors": vendors_, "purchase_orders": pos, "ledger": db.ledger_rows(),
-            "receipts": m["goods_receipts"]}
+                    "vendor": names.get(p["vendor_id"], p["vendor_id"]), "lines": p["lines"], **{k: v for k, v in st.items() if k != "prior_invoices"}})
+    return {"company": m["company"], "vendors": [_vendor_row(v) for v in db.vendors_all()], "purchase_orders": pos,
+            "ledger": db.ledger_rows(), "receipts": m["goods_receipts"]}
+
+
+def _vendor_row(v: dict) -> dict:
+    b = v["bank"]
+    return {**{k: v[k] for k in ("vendor_id", "legal_name", "tax_id", "status", "status_reason", "payment_terms", "email_domain", "phone_on_file",
+                                 "source", "first_run_id", "created_at", "verified_at", "verified_by")},
+            "bank": f"{b['bank_name'] or 'Bank'} ••••{b['account_number'][-4:]}" if b["account_number"] else "Not on file yet",
+            "ifsc": b["ifsc"] or None}
+
+
+class VendorAction(BaseModel):
+    actor: str = ""
+    reason: str = Field("", max_length=300)
+
+
+@app.post("/api/vendors/{vendor_id}/verify")
+def verify_vendor(vendor_id: str, body: VendorAction, request: Request):
+    """One-time check of a vendor learned from an invoice. Their waiting invoices are then re-checked against every rule."""
+    actor = actor_of(request, body.actor)
+    try:
+        v = db.vendor_set_status(vendor_id, "active", actor, body.reason or "verified")
+    except ValueError as e:
+        raise HTTPException(404 if "not found" in str(e) else 400, str(e))
+    rechecked = []
+    for r in db.list_runs(10000, archived=None):
+        if r["vendor_id"] == vendor_id and r["decision"] == "HOLD" and (r["review_status"] or "pending") == "pending" and r["status"] == "done":
+            try:
+                rechecked.append(pipeline.recheck(r["id"], actor, f"Vendor {vendor_id} verified"))
+            except ValueError:
+                pass
+    return {"vendor": _vendor_row(v), "rechecked": rechecked}
+
+
+@app.post("/api/vendors/{vendor_id}/block")
+def block_vendor(vendor_id: str, body: VendorAction, request: Request):
+    if not body.reason.strip():
+        raise HTTPException(400, "Add a reason. It's recorded and shown on every invoice from this vendor.")
+    try:
+        return {"vendor": _vendor_row(db.vendor_set_status(vendor_id, "blocked", actor_of(request, body.actor), body.reason.strip()))}
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.post("/api/vendors/{vendor_id}/unblock")
+def unblock_vendor(vendor_id: str, body: VendorAction, request: Request):
+    try:
+        return {"vendor": _vendor_row(db.vendor_set_status(vendor_id, "active", actor_of(request, body.actor), body.reason or "unblocked"))}
+    except ValueError as e:
+        raise HTTPException(404, str(e))
 
 
 @app.get("/api/policy")

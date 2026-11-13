@@ -32,7 +32,7 @@ EXTRACTION_SCHEMA = {
     "required": [
         "document_type", "vendor_name", "vendor_address", "vendor_tax_id", "vendor_email", "vendor_phone",
         "bill_to_name", "invoice_number", "invoice_date", "due_date", "po_reference", "payment_terms",
-        "currency", "line_items", "subtotal", "tax_amount", "tax_rate_pct", "shipping_amount", "total_amount",
+        "currency", "line_items", "subtotal", "tax_amount", "tax_rate_pct", "shipping_amount", "discount_amount", "round_off", "total_amount",
         "tax_inclusive", "bank_details", "payment_instruction_notes", "field_confidence", "extraction_warnings",
     ],
     "properties": {
@@ -53,10 +53,12 @@ EXTRACTION_SCHEMA = {
                 "properties": {"description": {"type": "string"}, "quantity": NUM, "unit_price": NUM, "amount": NUM},
             },
         },
-        "subtotal": {"type": ["number", "null"], "description": "Amount before tax (often labelled 'Taxable Value' on Indian GST invoices)"},
+        "subtotal": {"type": ["number", "null"], "description": "Sum of the line amounts before any discount and before tax ('Subtotal', 'Gross Amount', or 'Taxable Value' when there is no discount)"},
+        "discount_amount": {"type": ["number", "null"], "description": "Discount deducted in the totals block (trade / cash / special discount), as a positive number. Null if none"},
         "tax_amount": {"type": ["number", "null"], "description": "Total GST charged: CGST + SGST (or UTGST), or IGST. Null if no tax is charged"},
         "tax_rate_pct": NUM,
         "shipping_amount": {"type": ["number", "null"], "description": "Only a shipping/freight charge printed as its own row in the totals block. If freight appears as a line item, leave this null"},
+        "round_off": {"type": ["number", "null"], "description": "Signed 'Round Off' / 'Rounding' adjustment row in the totals block (e.g. -0.40). Null if none is printed"},
         "total_amount": NUM,
         "tax_inclusive": {"type": "boolean"},
         "bank_details": {
@@ -83,6 +85,8 @@ Rules:
 - These are Indian invoices. Amounts are in rupees (Rs., ₹ or INR) and use Indian digit grouping (12,34,567.50 = 1234567.50). Return numbers as plain decimals with no currency symbols or separators. currency is "INR" unless another currency is printed.
 - Dates are ISO YYYY-MM-DD. Numeric dates on Indian documents are day first: 08/11/2026 and 08.11.2026 are 8 November 2026.
 - GST: tax_amount is the total tax charged, i.e. CGST + SGST (or UTGST) added together, or IGST. tax_rate_pct is the combined rate (9% CGST + 9% SGST = 18). If the invoice says GST is payable under reverse charge (RCM) or "GST extra", no tax is charged on it: tax_amount = null.
+- discount_amount: a discount row in the totals block ("Less: Trade Discount @ 5%", "Discount", "Cash discount") as a POSITIVE number. subtotal stays the gross sum of the lines; GST is charged on subtotal minus discount. Payment-term discounts like "2/10 Net 30" are not a discount_amount.
+- round_off: many Indian invoices round the payable to the nearest rupee with a "Round Off" row (e.g. -0.40 or +0.30). Copy it with its sign; total_amount is the final rounded amount payable.
 - vendor_tax_id is the vendor's GSTIN (15 characters, e.g. 29AAKCS3127M1Z6), not the buyer's.
 - line_items: one entry per printed line. amount is the printed line total.
 - shipping_amount is only for a shipping/freight row in the totals block (next to subtotal and tax). If freight is listed as a line item, it belongs in line_items only. Never count it twice.
@@ -312,7 +316,8 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
                     return _to_float(amts[-1])
         return None
 
-    subtotal = label_amount(r"^(?:sub\s*total|taxable\s*value)\b")
+    subtotal = label_amount(r"^(?:sub\s*total|gross\s*amount|taxable\s*value)\b")
+    disc = label_amount(r"^(?:less\s*:?\s*)?(?:trade\s*|cash\s*|special\s*)?discount\b")
     gst_parts = []
     for l in lines:  # CGST + SGST (intra-state) or IGST (inter-state): sum every GST row
         if re.match(r"(?i)^(?:cgst|sgst|utgst|igst)\b", l):
@@ -321,6 +326,12 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
                 gst_parts.append(_to_float(a[-1]))
     tax = round(sum(gst_parts), 2) if gst_parts else label_amount(r"^(?:gst|tax)\b")
     ship = label_amount(r"^shipping(?:\s*(?:&|and)\s*handling)?\b")
+    ro = None
+    for l in lines:  # "Round Off  (-) 0.40" / "Rounding -0.40"
+        m = re.match(r"(?i)^round(?:ing|\s*off)\b.*?(\(?[-+−]\)?)?\s*(?:Rs\.?\s*)?(\d[\d,]*\.\d{2})\s*$", l)
+        if m:
+            ro = _to_float(m.group(2)) * (-1 if m.group(1) and any(c in m.group(1) for c in "-−") else 1)
+            break
     total = (label_amount(r"^(?:total\s*due|amount\s*due|amount\s*payable|balance\s*due|total\s*\(?inr\)?|grand\s*total|net\s*payable)\b")
              or label_amount(r"^total\b"))
     ifsc = _find([r"IFSC(?:\s*Code)?\s*:?\s*([A-Z]{4}0[A-Z0-9]{6})"], text)
@@ -337,7 +348,7 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
         "vendor_email": email, "vendor_phone": None, "bill_to_name": "Lumen Home Goods Pvt. Ltd." if "Lumen Home Goods" in text else None,
         "invoice_number": inv_no, "invoice_date": _to_date(date_raw), "due_date": None, "po_reference": po,
         "payment_terms": terms, "currency": "INR", "line_items": lines_out,
-        "subtotal": subtotal, "tax_amount": tax, "tax_rate_pct": None, "shipping_amount": ship, "total_amount": total,
+        "subtotal": subtotal, "tax_amount": tax, "tax_rate_pct": None, "shipping_amount": ship, "discount_amount": abs(disc) if disc else None, "round_off": ro, "total_amount": total,
         "tax_inclusive": False,
         "bank_details": {"bank_name": bank, "ifsc": ifsc, "account_number": acct, "iban": None, "swift": None},
         "payment_instruction_notes": change_note,
