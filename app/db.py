@@ -29,7 +29,8 @@ DEFAULT_POLICY = {
     "price_tolerance_pct": 2.0,          # max variance vs PO, percent ...
     "price_tolerance_abs": 40000.0,      # ... and absolute rupees; the tighter of the two applies
     "arithmetic_tolerance": 0.05,        # rounding slack on sums
-    "small_difference_max": 10.0,        # Rs.: amount gaps up to this are rounding, never a problem (totals, lines, PO, repeats)
+    "small_difference_max": 10.0,        # Rs. ... gaps up to the SMALLER of this and
+    "small_difference_pct": 2.0,         # ... this % of the amount are rounding, never a problem (totals, lines, PO, repeats)
     "high_value_threshold": 2500000.0,   # Rs. 25 lakh: above this a controller signs off, even if matched
     "inferred_po_auto_approve": True,    # may an inferred (not quoted) PO be auto-approved?
     "inferred_po_min_confidence": 0.85,

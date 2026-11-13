@@ -56,11 +56,16 @@ LIVE_LOCK = threading.Lock()
 
 
 # ============================================================ helpers
-SMALL_DIFF = 10.0  # ₹: default for policy small_difference_max. Gaps this small are rounding, never a threat.
+def small(P: dict, base: float | None) -> float:
+    """Gap that counts as rounding, never a threat: the smaller of ₹small_difference_max (10) and
+    small_difference_pct (2%) of the amount being compared."""
+    cap = float(P.get("small_difference_max", 10.0))
+    pct = float(P.get("small_difference_pct", 2.0))
+    return round(min(cap, abs(base or 0) * pct / 100), 2)
 
 
-def small(P: dict) -> float:
-    return float(P.get("small_difference_max", SMALL_DIFF))
+def small_rule(P: dict) -> str:
+    return f"the smaller of {money(float(P.get('small_difference_max', 10.0)))} and {float(P.get('small_difference_pct', 2.0)):g}% of the amount"
 
 
 GST_SLABS = (0.25, 3, 5, 12, 18, 28, 40)  # GST rate slabs in India (combined CGST+SGST or IGST)
@@ -485,7 +490,6 @@ def st_validate(ctx):
     inv, P, checks = ctx["inv"], ctx["policy"], []
     company = ctx["master"]["company"]
     tol = P["arithmetic_tolerance"]
-    sd = small(P)
 
     # document type
     dt = inv.get("document_type")
@@ -521,7 +525,7 @@ def st_validate(ctx):
     # line arithmetic
     lines = inv["line_items"]
     bad = [li for li in lines if None not in (li["quantity"], li["unit_price"], li["amount"])
-           and abs(li["quantity"] * li["unit_price"] - li["amount"]) > max(sd, 0.005 * abs(li["amount"]))]
+           and abs(li["quantity"] * li["unit_price"] - li["amount"]) > max(tol, small(P, li["amount"]))]
     line_sum = r2(sum(li["amount"] or 0 for li in lines))
     sub = inv.get("subtotal") if inv.get("subtotal") is not None else line_sum
     if bad:
@@ -531,10 +535,11 @@ def st_validate(ctx):
         checks.append(chk("val.lines", "Line math (qty × price = amount)", "pass", f"All {len(lines)} lines multiply out"))
     if lines and inv.get("subtotal") is not None:
         g = abs(line_sum - inv["subtotal"])
-        ok = g <= sd
+        sd = small(P, inv["subtotal"])
+        ok = g <= max(sd, tol)
         checks.append(chk("val.subtotal", "Lines sum to subtotal", "pass" if ok else "fail",
                           f"Σ lines {money(line_sum)} vs subtotal {money(inv['subtotal'])}"
-                          + (f" (off by {money(g)}: under {money(sd)}, treated as rounding)" if tol < g <= sd else ""),
+                          + (f" (off by {money(g)}: within {money(sd)}, {small_rule(P)}, treated as rounding)" if tol < g <= sd else ""),
                           None if ok else "hold", None if ok else "ap"))
 
     # totals & tax (tax may be separate or embedded)
@@ -551,6 +556,7 @@ def st_validate(ctx):
         how = "tax-inclusive pricing" if inv.get("tax_inclusive") else (f"subtotal {money(sub)}" + (f" − discount {money(disc)}" if disc else "")
                                                                          + f" + tax {money(tax)}" + (f" + shipping {money(ship)}" if ship else ""))
         gap = r2(total - expected)
+        sd = small(P, expected)
         if abs(gap) <= tol:
             checks.append(chk("val.total", "Totals reconcile", "pass", f"{how} = {money(expected)} vs stated total {money(total)}"))
         elif abs(gap) <= 1.0 and (abs(gap - ro) <= tol or abs(total - round(total)) <= tol):
@@ -561,11 +567,11 @@ def st_validate(ctx):
         elif abs(gap) <= sd:
             checks.append(chk("val.total", "Totals reconcile", "pass",
                               f"{how} = {money(expected)} vs stated total {money(total)}: a {money(abs(gap))} difference, "
-                              f"under {money(sd)}, so it's treated as rounding, not a problem"))
+                              f"within {money(sd)} ({small_rule(P)}), so it's treated as rounding, not a problem"))
         else:
             checks.append(chk("val.total", "Totals reconcile", "fail",
                               f"{how} = {money(expected)} vs stated total {money(total)}; off by {money(abs(gap))}, "
-                              f"more than the {money(sd)} allowed for rounding", "hold", "ap"))
+                              f"more than the {money(sd)} allowed for rounding ({small_rule(P)})", "hold", "ap"))
     net = (total - tax) if (inv.get("tax_inclusive") and total is not None) else ((sub or 0) - disc + ship)
     ctx["net_amount"] = r2(net)
     if tax and net:
@@ -764,7 +770,7 @@ def st_duplicates(ctx):
     ledger = [r for r in db.ledger_rows() if r["vendor_id"] == vendor["vendor_id"]]
     hit = next((r for r in ledger if r["invoice_number_norm"] == n), None)
     if hit:
-        same_amt = hit["total_amount"] is not None and inv.get("total_amount") is not None and abs(hit["total_amount"] - inv["total_amount"]) <= small(P)
+        same_amt = hit["total_amount"] is not None and inv.get("total_amount") is not None and abs(hit["total_amount"] - inv["total_amount"]) <= max(small(P, hit["total_amount"]), 0.05)
         paid = f", paid {hit['payment_ref']}" if hit.get("payment_ref") else ""
         detail = (f"'{inv['invoice_number']}' normalises to {n}, the same as ledger entry '{hit['invoice_number']}' "
                   f"(booked {hit['posted_at']}{paid}, {money(hit['total_amount'])})")
@@ -789,7 +795,7 @@ def st_duplicates(ctx):
     # fuzzy: same vendor, same amount, close dates, different number. Catches renumbered resubmissions.
     d = iso(inv.get("invoice_date"))
     fuzzy = [r for r in ledger if r["invoice_number_norm"] != n and inv.get("total_amount") is not None
-             and abs((r["total_amount"] or 0) - inv["total_amount"]) <= small(P) and d and iso(r["invoice_date"])
+             and abs((r["total_amount"] or 0) - inv["total_amount"]) <= max(small(P, r["total_amount"]), 0.05) and d and iso(r["invoice_date"])
              and abs((iso(r["invoice_date"]) - d).days) <= P["fuzzy_duplicate_window_days"]]
     if fuzzy:
         checks.append(chk("dup.fuzzy", "No near-duplicate (same amount, nearby date)", "fail",
@@ -941,19 +947,20 @@ def st_po_match(ctx):
     allowed = round(min(P["price_tolerance_pct"] / 100 * expected, P["price_tolerance_abs"]), 2)
     pct = (variance / expected * 100) if expected else 0
     disc = abs(inv.get("discount_amount") or 0.0)
-    if disc and abs(variance + disc) <= small(P):  # lines match the PO (give or take rounding); the vendor then gave a discount
+    rounding = min(small(P, expected), max(allowed, 0.05))  # never looser than the PO price tolerance
+    if disc and abs(variance + disc) <= max(rounding, 0.5):  # lines match the PO (give or take rounding); the vendor then gave a discount
         off = round(variance + disc, 2)
         checks.append(chk("po.price", "Price & quantity vs PO", "pass",
                           f"Lines match the PO value {money(expected)}; the vendor's {money(disc)} discount brings the net to {money(net)}"
-                          + (f". Lines are {money(abs(off))} {'over' if off > 0 else 'under'} the PO: under {money(small(P))}, treated as rounding" if abs(off) > 0.5 else ""),
+                          + (f". Lines are {money(abs(off))} {'over' if off > 0 else 'under'} the PO: within {money(rounding)} ({small_rule(P)}), treated as rounding" if abs(off) > 0.5 else ""),
                           evidence={"lines": rows}))
     elif variance <= 0.005:
         checks.append(chk("po.price", "Price & quantity vs PO", "pass" if variance > -0.005 else "info",
                           f"Invoice net {money(net)} vs PO value of billed lines {money(expected)}"
                           + ("" if variance > -0.005 else f" (under-billed by {money(-variance)})"), evidence={"lines": rows}))
-    elif variance <= small(P):
+    elif variance <= rounding:
         checks.append(chk("po.price", "Price & quantity vs PO", "pass",
-                          f"Invoice net {money(net)} is {money(variance)} over the PO value {money(expected)}: under {money(small(P))}, "
+                          f"Invoice net {money(net)} is {money(variance)} over the PO value {money(expected)}: within {money(rounding)} ({small_rule(P)}), "
                           "treated as rounding, not a price difference", evidence={"lines": rows}))
     elif variance <= allowed:
         checks.append(chk("po.price", "Price & quantity vs PO", "warn",
@@ -981,7 +988,7 @@ def st_po_match(ctx):
     stt = _po_state(po)
     after = round(stt["prior_billed"] + net, 2)
     overrun = round(after - stt["po_total"], 2)
-    cum_allowed = max(round(min(P["price_tolerance_pct"] / 100 * stt["po_total"], P["price_tolerance_abs"]), 2), small(P))
+    cum_allowed = max(round(min(P["price_tolerance_pct"] / 100 * stt["po_total"], P["price_tolerance_abs"]), 2), small(P, stt["po_total"]))
     prior_list = ", ".join(f"{b['invoice_number']} {money(b['net_amount'])}" for b in stt["prior_invoices"]) or "none"
     if overrun > cum_allowed:
         ctx["partial_approval"] = max(0.0, stt["remaining"])

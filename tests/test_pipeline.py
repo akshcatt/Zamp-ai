@@ -305,3 +305,11 @@ def test_total_off_by_more_than_10_rupees_is_held(env, monkeypatch):
         t["round_off"] = None
     r = _truth_run(env, monkeypatch, "happy_path", wrong)
     assert r["decision"] == "HOLD" and "more than the ₹10.00 allowed" in _check(r, "val.total")["detail"]
+
+
+def test_small_difference_is_the_smaller_of_10_rupees_and_2_percent(env):
+    db, pl = env
+    P = db.get_policy()
+    assert pl.small(P, 50000) == 10.0    # big amount: ₹10 is smaller than 2% (₹1,000)
+    assert pl.small(P, 200) == 4.0       # small amount: 2% (₹4) is smaller than ₹10
+    assert pl.small(P, 500) == 10.0      # the crossover
