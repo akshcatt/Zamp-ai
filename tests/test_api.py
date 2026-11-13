@@ -239,3 +239,17 @@ def test_old_database_is_migrated(monkeypatch):
     importlib.reload(db)
     db.init()
     assert db.list_runs()[0]["id"] == "R-old" and db.list_runs()[0]["archived_at"] is None
+
+
+def test_autoload_replays_samples_from_stored_reads(monkeypatch):
+    """A fresh empty deployment reloads the samples with no AI calls, and decisions match the real reads."""
+    c, db, pl = make_client(monkeypatch)
+    from app import demo
+    assert demo.autoload_samples(wait=True) == 9
+    runs = db.list_runs(archived=None)
+    assert len(runs) == 9 and all(r["status"] == "done" for r in runs)
+    assert all(r["extractor"] == "gemini (cached)" for r in runs)
+    by_file = {r["filename"][:2]: r["decision"] for r in runs}
+    assert by_file == {"01": "APPROVE", "02": "HOLD", "03": "APPROVE", "04": "REJECT", "05": "HOLD",
+                       "06": "APPROVE", "07": "REJECT", "08": "APPROVE", "09": "NOT_INVOICE"}
+    assert demo.autoload_samples(wait=True) == 0  # never touches a database that already has data

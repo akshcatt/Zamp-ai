@@ -106,8 +106,9 @@ def r2(x):
 
 
 # ============================================================ run orchestration
-def start_run(pdf_bytes: bytes, filename: str, source: str, manual: dict | None = None) -> str:
-    """Start a run in the background. `manual` = fields a person keyed in (skips the AI read, every rule still runs)."""
+def start_run(pdf_bytes: bytes, filename: str, source: str, manual: dict | None = None, saved_read: bool = False) -> str:
+    """Start a run in the background. `manual` = fields a person keyed in (skips the AI read, every rule still runs).
+    `saved_read` = reuse a stored AI read of this exact file if there is one (used to reload the demo samples)."""
     run_id = datetime.now().strftime("R%y%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
     db.put_file(run_id, pdf_bytes)
     db.insert_run({"id": run_id, "created_at": db.now_iso(), "filename": filename, "source": source,
@@ -115,7 +116,7 @@ def start_run(pdf_bytes: bytes, filename: str, source: str, manual: dict | None 
                    "trace_json": "{}", "events_json": "[]"})
     with LIVE_LOCK:
         LIVE[run_id] = []
-    threading.Thread(target=_run, args=(run_id, pdf_bytes, filename, manual), daemon=True).start()
+    threading.Thread(target=_run, args=(run_id, pdf_bytes, filename, manual, saved_read), daemon=True).start()
     return run_id
 
 
@@ -141,11 +142,11 @@ def _persist_events(run_id: str, trace: dict) -> None:
     db.update_run(run_id, events_json=json.dumps(evs, default=str), trace_json=json.dumps(trace, default=str))
 
 
-def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None) -> None:
+def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None, saved_read: bool = False) -> None:
     import json
     t_start = time.time()
     ctx = {"run_id": run_id, "pdf": pdf, "filename": filename, "policy": db.get_policy(),
-           "master": db.master(), "trace": {"stages": {}}, "manual": manual}
+           "master": db.master(), "trace": {"stages": {}}, "manual": manual, "saved_read": saved_read}
     trace = ctx["trace"]
     _emit(run_id, "run_start", stages=[{"key": k, "label": l} for k, l in STAGES], policy=ctx["policy"])
     try:
@@ -158,7 +159,7 @@ def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None) -> 
             else:
                 out = fn(ctx)
             elapsed = time.time() - t0
-            if PACING_MS and elapsed * 1000 < PACING_MS:
+            if PACING_MS and not saved_read and elapsed * 1000 < PACING_MS:
                 time.sleep(PACING_MS / 1000 - elapsed)
             out["duration_ms"] = int(elapsed * 1000)  # real work time; the demo pause above is not counted
             trace["stages"][key] = out
@@ -374,6 +375,9 @@ def st_extract(ctx):
         data.setdefault("document_type", "invoice")
         meta = {"extractor": "manual", "model": None, "latency_ms": 0}
         notes.append(f"Keyed in by {m.get('_actor') or 'a reviewer'}. The AI read was skipped; every rule still runs.")
+    elif ctx.get("saved_read") and (saved := db.cache_get(ctx["sha"])):
+        data, meta = saved["data"], {"extractor": f"{saved['extractor']} (cached)", "model": None, "latency_ms": 0}
+        notes.append("Reloaded sample: reusing the stored AI read of this exact file. Every rule still runs.")
     elif llm_available():
         try:
             data, meta = extract_with_gemini(ctx["pdf"], ctx.get("text", ""))

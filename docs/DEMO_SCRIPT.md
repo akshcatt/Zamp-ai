@@ -4,7 +4,7 @@
 
 1. `cp .env.example .env` and put your free Gemini key in (https://aistudio.google.com/api-keys). Then `./run.sh` → open http://localhost:8000.
 2. `.venv/bin/python scripts/smoke_llm.py`. Every line must say PASS. It pauses between invoices to stay within free-tier rate limits. (It uses its own temporary database, so it won't touch the demo data.)
-3. On the Overview page, click **Reset demo data**. This gives you a clean ledger and empty history.
+3. On the Overview page, click **Reset demo data**. This gives you a clean ledger and empty history. **Don't skip this on the hosted app:** it auto-loads the 9 samples after every restart, so without a reset the samples you upload on camera would be caught as repeat invoices.
 4. The top-right badge must read **AI on · gemini-3.1-flash-lite** (green dot). If it says "AI off · basic reader", the key isn't loaded.
    On the deployed site, **How it works → Run connection test** confirms the key works on the server.
    Click **Set your name** in the top bar so your reviews are recorded under your name.

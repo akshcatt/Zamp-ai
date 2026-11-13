@@ -68,7 +68,13 @@ The repo includes a `Dockerfile` and a `render.yaml`:
 - **Render:** New → Blueprint → point it at this repo → set `GEMINI_API_KEY` (and optionally `APP_USERNAME` / `APP_PASSWORD` to require sign-in).
 - **Railway / Fly / Hugging Face Spaces (Docker):** same image. It listens on `$PORT`.
 
-Storage is a single SQLite database file (`data/ap.db`). It holds the invoices, the payment record, the review history, your rules, the saved AI reads, and the original documents. **Records → Database** shows what's in it and has a **Download backup** button, a consistent snapshot taken even while invoices are running. On Render's free tier the container's disk resets on redeploy. That's fine for a demo, and "Reset demo data" on the Overview page does the same thing on purpose.
+Storage is a single SQLite database file (`data/ap.db`). It holds the invoices, the payment record, the review history, your rules, the saved AI reads, and the original documents. **Records → Database** shows what's in it and has a **Download backup** button, a consistent snapshot taken even while invoices are running. Render's free plan has no persistent disk, so the database is wiped when the instance sleeps (after ~15 idle minutes) and on every redeploy; while it wakes, Render answers 503. The blueprint handles this for a demo:
+
+- `KEEP_AWAKE=1` makes the app ping its own URL every 10 minutes, so it doesn't sleep (data now only resets on a redeploy).
+- `DEMO_AUTOLOAD=1` reloads the 9 sample invoices whenever the database starts empty, from stored Gemini reads in `app/seed/demo_reads.json` (no AI calls; every rule still runs). Rebuild them with `scripts/build_demo_reads.py`.
+- The page retries quietly with a "waking up" notice instead of failing on a 502/503/504.
+
+For data that survives redeploys, use a paid instance with a disk mounted at `/app/data` (commented out at the bottom of `render.yaml`).
 
 ## What's in the box
 

@@ -12,6 +12,13 @@ services:
         sync: false
       - key: AP_TODAY
         value: "2026-11-12"
+      # Free plan has no persistent disk: files are wiped when the instance sleeps (~15 idle min)
+      # and on every redeploy. KEEP_AWAKE pings our own URL every 10 min so it doesn't sleep;
+      # DEMO_AUTOLOAD reloads the sample invoices (from stored AI reads) whenever the DB starts empty.
+      - key: KEEP_AWAKE
+        value: "1"
+      - key: DEMO_AUTOLOAD
+        value: "1"
       # Optional sign-in. Leave APP_USERNAME / APP_PASSWORD empty to keep the demo open.
       - key: APP_USERNAME
         sync: false
@@ -19,3 +26,9 @@ services:
         sync: false
       - key: APP_SECRET            # signs session cookies; generated once by Render
         generateValue: true
+    # For data that survives redeploys too, move to a paid instance and attach a disk:
+    # plan: starter
+    # disk:
+    #   name: clearap-data
+    #   mountPath: /app/data
+    #   sizeGB: 1

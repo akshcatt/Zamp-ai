@@ -24,11 +24,35 @@ const api = async (path, opts = {}) => {
   const method = (opts.method || "GET").toUpperCase();
   const headers = { ...(opts.headers || {}) };
   if (method !== "GET" && session.csrf) headers["X-CSRF-Token"] = session.csrf;
-  const r = await fetch(path, { ...opts, headers });
+  // Free hosting sleeps when idle and briefly answers 502/503/504 while waking or redeploying.
+  // Reads retry quietly for about a minute; writes never auto-retry (that could submit twice).
+  const retryable = method === "GET";
+  let r;
+  for (let i = 0; ; i++) {
+    try {
+      r = await fetch(path, { ...opts, headers });
+      if (!(retryable && [502, 503, 504].includes(r.status))) break;
+    } catch (e) { if (!retryable) { waking(false); throw new Error("Can't reach the server. Check your connection and try again."); } }
+    if (i >= 14) { waking(false); throw new Error("The server is still starting. Refresh in a moment."); }
+    waking(true);
+    await new Promise((res) => setTimeout(res, Math.min(1000 * (i + 1), 5000)));
+  }
+  waking(false);
+  if ([502, 503, 504].includes(r.status)) throw new Error("The server is waking up. Try again in a few seconds.");
   if (r.status === 401) { location.href = "/login"; throw new Error("Please sign in again."); }
   if (!r.ok) { let m = r.statusText; try { const j = await r.json(); m = typeof j.detail === "string" ? j.detail : (j.detail?.[0]?.msg || m); } catch {} throw new Error(m); }
   return r.json();
 };
+function waking(on) {
+  let el = document.getElementById("waking");
+  if (!on) { if (el) el.hidden = true; return; }
+  if (!el) {
+    el = document.createElement("div"); el.id = "waking"; el.setAttribute("role", "status");
+    el.textContent = "Server is waking up… this takes up to a minute on free hosting.";
+    document.body.appendChild(el);
+  }
+  el.hidden = false;
+}
 const postJSON = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), 2600); };
 const tip = (text) => `<span class="tip" tabindex="0" data-tip="${esc(text)}">?</span>`;

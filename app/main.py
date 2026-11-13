@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, pipeline, security
+from . import db, demo, pipeline, security
 from .extract import MODEL, llm_available
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,8 +31,10 @@ app = FastAPI(title="ClearAP · Invoice to Decision", version="1.1", docs_url="/
 app.add_middleware(security.SecurityMiddleware)
 db.init()
 _recovered = db.recover_interrupted()
+_demo = demo.start()
 print(f"ClearAP ready: db={db.DB_PATH} reader={'gemini ' + MODEL if llm_available() else 'heuristic (no GEMINI_API_KEY)'}"
-      f" login={'on' if security.AUTH_ENABLED else 'off'} recovered={len(_recovered)} version={VERSION}", flush=True)
+      f" login={'on' if security.AUTH_ENABLED else 'off'} recovered={len(_recovered)} version={VERSION}"
+      f" autoload={_demo['autoloaded']} keep_awake={_demo['keep_awake']}", flush=True)
 
 
 def actor_of(request: Request, claimed: str | None) -> str:
