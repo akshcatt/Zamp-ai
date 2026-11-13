@@ -254,7 +254,7 @@ function paintMomentum(s) {
   const el = $("#momentum");
   el.innerHTML = `<div class="mo-top">
       <div class="ring" style="--p:${pct}"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15.915"/><circle class="fg" cx="18" cy="18" r="15.915" stroke-dasharray="${pct} 100"/></svg><span>${pend || "✓"}</span></div>
-      <div style="min-width:0"><b>${pend ? `${pend} to clear` : "Queue zero"}</b><div class="faint small">${today} decided today${s.streak_days > 1 ? ` · 🔥 ${s.streak_days}-day streak` : ""}</div></div></div>
+      <div style="min-width:0"><b>${pend ? `${pend} to clear` : s.processed ? "Queue zero" : "No invoices yet"}</b><div class="faint small">${today} decided today${s.streak_days > 1 ? ` · 🔥 ${s.streak_days}-day streak` : ""}</div></div></div>
     <a class="mo-wins" href="#/" title="Milestones on the Overview"><span>Milestones</span><span class="mono">${won.length}/${ms.length}</span><i style="width:${(100 * won.length) / ms.length}%"></i></a>`;
   // celebrate real progress, once
   if (chrome.pending > 0 && pend === 0) { toast("Queue zero. Every invoice has a decision.", "win"); el.classList.add("celebrate"); setTimeout(() => el.classList.remove("celebrate"), 1400); }
@@ -1146,7 +1146,7 @@ async function viewRules() {
       <p class="muted small" style="margin-top:-6px">Sends a one-word test to the model with the server's key, so you can confirm reading works before a demo. The key itself never leaves the server.</p>
       <button class="btn" id="aitest">Run connection test</button><div id="aires" class="small" style="margin-top:12px"></div></div>
   </div>
-  <div class="card pad" style="margin-top:16px"><h2>Your rules</h2><p class="muted" style="margin:-6px 0 18px">Changes apply to the next invoice. Try setting the price wiggle room to 0.5% and re-running the Pinnacle sample: it flips from approved to needs review.</p>
+  <div class="card pad" style="margin-top:16px"><h2>Your rules</h2><p class="muted" style="margin:-6px 0 18px">Changes apply to the next invoice. Try setting the price wiggle room to 0.5% and re-running the Pragati sample: it flips from approved to needs review.</p>
     <form class="policy-form" id="pf">${fields.map(([k, l, h]) => `<label>${l}<input type="number" step="any" name="${k}" value="${p[k]}"><small>${h}</small></label>`).join("")}
       <label>Approve guessed POs automatically?<select name="inferred_po_auto_approve"><option value="true" ${p.inferred_po_auto_approve ? "selected" : ""}>Yes, if we're sure enough</option><option value="false" ${!p.inferred_po_auto_approve ? "selected" : ""}>No, always ask the buyer</option></select><small>Strict "no PO, no pay" companies pick No</small></label>
     </form><button class="btn primary" style="margin-top:18px" id="save">Save rules</button></div>
