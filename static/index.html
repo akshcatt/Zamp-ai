@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="ClearAP reads invoices, checks them against orders, vendors and past payments, and decides: pay, review, or reject." />
+  <meta name="theme-color" content="#171717" />
   <title>ClearAP · Invoice to Decision</title>
   <script>try { const t = localStorage.getItem("clearap-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -21,6 +23,7 @@
       <a href="#/" data-route="dashboard">Overview</a>
       <a href="#/inbox" data-route="inbox">Upload</a>
       <a href="#/queue" data-route="queue">Needs review <span id="queue-count" class="pill-count" hidden></span></a>
+      <a href="#/vendors" data-route="vendors">Vendors</a>
       <a href="#/data" data-route="data">Records</a>
       <a href="#/rules" data-route="rules">How it works</a>
     </nav>
@@ -28,6 +31,7 @@
       <button class="kbd-btn" id="open-cmd" title="Search (⌘K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search</span><kbd>⌘K</kbd></button>
       <button class="icon-btn" id="theme" title="Switch light / dark" aria-label="Switch light or dark theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></button>
       <div class="mode" id="mode" title="Which engine reads the invoices"></div>
+      <button class="who" id="who" type="button"></button>
       <a class="btn primary sm hide-sm" href="#/inbox">Upload invoice</a>
     </div>
   </header>

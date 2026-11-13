@@ -1,0 +1,185 @@
+{
+  "run_on": "2026-11-13",
+  "model": "gemini-3.1-flash-lite",
+  "samples": 8,
+  "field_accuracy": 100.0,
+  "fields_correct": 80,
+  "fields_total": 80,
+  "decision_accuracy": 100.0,
+  "decisions_correct": 8,
+  "median_read_seconds": 3.5,
+  "by_field": [
+    {
+      "field": "Vendor name",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Invoice number",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Invoice date",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "PO reference",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Subtotal",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Tax",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Shipping",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Total",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Line items (count & amounts)",
+      "correct": 8,
+      "total": 8
+    },
+    {
+      "field": "Remit-to account",
+      "correct": 8,
+      "total": 8
+    }
+  ],
+  "rows": [
+    {
+      "sample": "01_happy_northwind_NW-58213.pdf",
+      "kind": "Happy path",
+      "decision": "APPROVE",
+      "route": "Auto-approved \u2192 payment run",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3651,
+      "seconds": 4.3
+    },
+    {
+      "sample": "02_edge_split_billing_atlas_ATL-INV-1209.pdf",
+      "kind": "Edge case 1",
+      "decision": "HOLD",
+      "route": "Procurement / Buyer",
+      "expected": "HOLD",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3366,
+      "seconds": 3.5
+    },
+    {
+      "sample": "03_edge_scanned_no_po_brightline_BLX-30871.pdf",
+      "kind": "Edge case 2",
+      "decision": "APPROVE",
+      "route": "Auto-approved \u2192 payment run",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3140,
+      "seconds": 3.3
+    },
+    {
+      "sample": "04_edge_disguised_duplicate_meridian_INV-2026-0417.pdf",
+      "kind": "Edge case 3",
+      "decision": "REJECT",
+      "route": "Rejected: duplicate",
+      "expected": "REJECT",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 4850,
+      "seconds": 4.9
+    },
+    {
+      "sample": "05_edge_bank_change_keystone_KFM-2026-1147.pdf",
+      "kind": "Edge case 4",
+      "decision": "HOLD",
+      "route": "Treasury & Fraud",
+      "expected": "HOLD",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3387,
+      "seconds": 3.5
+    },
+    {
+      "sample": "06_variant_tolerance_pinnacle_PPP-7734.pdf",
+      "kind": "Extra input",
+      "decision": "APPROVE",
+      "route": "Auto-approved \u2192 payment run",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 4323,
+      "seconds": 4.5
+    },
+    {
+      "sample": "07_variant_missing_fields_halcyon.pdf",
+      "kind": "Extra input",
+      "decision": "REJECT",
+      "route": "Returned to vendor",
+      "expected": "REJECT",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3772,
+      "seconds": 3.9
+    },
+    {
+      "sample": "08_variant_phone_photo_northwind_NW-58377.jpg",
+      "kind": "Extra input",
+      "decision": "APPROVE",
+      "route": "Auto-approved \u2192 payment run",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 10,
+      "fields": 10,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3281,
+      "seconds": 3.5
+    }
+  ]
+}

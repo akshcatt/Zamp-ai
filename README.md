@@ -24,15 +24,46 @@ open http://localhost:8000
 
 No API key? It still runs. It falls back to a heuristic text parser, and scanned invoices go to a human for manual keying. The badge in the top-right shows which reader is active.
 
-**Before a demo:** `.venv/bin/python scripts/smoke_llm.py` runs every sample against the real Gemini API and checks each decision against the expected one.
+**Before a demo:** `.venv/bin/python scripts/smoke_llm.py` runs every sample against the real Gemini API and checks each decision against the expected one. **How it works → Check the AI connection** does a one-call check from the browser.
 
-**Tests:** `.venv/bin/python -m pytest -q tests` runs 23 end-to-end tests: every sample with a perfect reader, the heuristic path, photo intake (JPG/PNG/HEIC), unsupported files, policy changes, and re-submission.
+**Benchmark:** `.venv/bin/python scripts/benchmark.py` scores what the AI read, field by field, against the exact data each sample was generated from, plus the final decision. Latest run: **80/80 fields, 8/8 decisions, ~3.5 s per read** with `gemini-3.1-flash-lite` ([docs/BENCHMARK.md](docs/BENCHMARK.md)). Eight clean synthetic documents is a smoke test, not proof; the page says so too.
+
+**Tests:** `.venv/bin/python -m pytest -q tests` runs 34 tests:
+- **Pipeline:** every sample through the pipeline with a perfect reader, the heuristic path, photo intake (JPG/PNG/HEIC), unsupported files, policy changes, re-submission, and persistence across a restart.
+- **HTTP API:** batch intake, correct-and-re-check, bulk review, restart recovery, vendor profiles, Excel/CSV export, health and security headers, and the login with CSRF and tamper-proof sessions.
+
+## Features
+
+- **Live processing:** each invoice streams through 8 steps with the evidence behind every check, and the original document can be shown side by side with what the AI read.
+- **Batch intake:** drop up to 25 files at once and track them together; a bad file never blocks the others.
+- **Exceptions only:** held invoices go to the team that owns the problem, with a deadline (due soon or overdue). **Bulk approve/reject** takes one note, and each invoice is still checked and audited on its own.
+- **Correct & re-check:** a reviewer types or fixes the fields from the document (an unreadable scan, a misread total), and the invoice re-runs through every rule. The original is kept, marked superseded, and linked both ways in the history.
+- **Vendor profiles:** what each vendor has sent, what was approved, what's waiting, open purchase-order balance, and red flags (bank-change attempts, repeat invoices, blocked in the master).
+- **Analytics:** volume over time, outcome mix, top exception reasons, reviewer workload and turnaround, time per step, and reader mix. Every chart has hover detail and a table view.
+- **Exports:** an Excel workbook (Summary, Invoices, every Exception, Ledger), CSV, and a full database backup.
+- **Accountability:** every human action records who and why. With sign-in on, the signed-in user is recorded and can't be spoofed from the browser.
+- **Resilience:** if the server restarts mid-run, that invoice is held for a person (never silently lost or paid); if the AI is down, a text parser takes over; if nothing can read the document, a person keys it in.
+
+## Security & operations
+
+| Setting | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | Enables the AI reader. Without it, the basic text reader is used. |
+| `APP_USERNAME`, `APP_PASSWORD` | Turn on sign-in. If either is empty, the app is open (handy for a demo). |
+| `APP_SECRET` | Signs session cookies (Render generates it). Sessions last 7 days. |
+| `AP_GEMINI_MODEL` | Optional model override (default `gemini-3.1-flash-lite`, with fallbacks). |
+
+- **Sign-in:** HMAC-signed session cookies (HttpOnly, SameSite=Lax, Secure on HTTPS) and a CSRF token on every state-changing request. Login attempts are rate-limited, and so are uploads (60 per minute per IP).
+- **Headers:** CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, and HSTS on HTTPS.
+- **Uploads:** checked by magic bytes (never the extension), limited to 20 MB each and 25 per batch, filenames sanitised. Exports neutralise spreadsheet formulas.
+- **Container:** runs as a non-root user, with a Docker `HEALTHCHECK`. `/healthz` checks the database for the platform's probe, and API docs are at `/api/docs`.
+- **Secrets:** the API key never leaves the server. The AI test endpoint redacts it from any error message.
 
 ## Deploy (live link)
 
 The repo includes a `Dockerfile` and a `render.yaml`:
 
-- **Render:** New → Blueprint → point it at this repo → set `GEMINI_API_KEY`.
+- **Render:** New → Blueprint → point it at this repo → set `GEMINI_API_KEY` (and optionally `APP_USERNAME` / `APP_PASSWORD` to require sign-in).
 - **Railway / Fly / Hugging Face Spaces (Docker):** same image. It listens on `$PORT`.
 
 Storage is a single SQLite database file (`data/ap.db`). It holds the invoices, the payment record, the review history, your rules, the saved AI reads, and the original documents. **Records → Database** shows what's in it and has a **Download backup** button, a consistent snapshot taken even while invoices are running. On Render's free tier the container's disk resets on redeploy. That's fine for a demo, and "Reset demo data" on the Overview page does the same thing on purpose.
@@ -45,8 +76,10 @@ Storage is a single SQLite database file (`data/ap.db`). It holds the invoices, 
 | `app/extract.py` | Gemini extraction (PDF in, strict JSON schema out, per-field confidence) plus the heuristic fallback |
 | `app/db.py` | SQLite (WAL mode, one file): runs, invoice ledger, audit trail, editable policy, extraction cache, uploaded documents; backup snapshot |
 | `app/seed/master_data.json` | The "ERP": 8 vendors (one blocked), 8 POs, goods receipts, invoice history |
-| `app/main.py` | FastAPI: REST, plus Server-Sent Events for the live run view |
-| `static/` | The UI: overview, upload, live invoice view (with side-by-side document check), needs-review list with deadlines, records, how it works. Light/dark theme, ⌘K search, CSV export |
+| `app/main.py` | FastAPI: REST + Server-Sent Events, batch intake, bulk review, re-keying, vendor profiles, exports, health |
+| `app/security.py` | Optional sign-in, signed sessions, CSRF, rate limits, security headers |
+| `static/` | The UI: overview with analytics, upload (single or batch), live invoice view with side-by-side check and correction form, needs-review with bulk actions, vendors, records, how it works (accuracy, AI connection test, editable rules). Light/dark, ⌘K search |
+| `scripts/benchmark.py` | Field-level and decision accuracy against the real model; writes `docs/BENCHMARK.md` |
 | `samples/` | 8 test invoices in 3 vendor layouts, including an image-only scan and a phone photo (JPEG) |
 | `scripts/generate_samples.py` | Regenerates the test invoices |
 | `docs/DESIGN.md` | Process map, assumptions, rules, edge-case rationale, trade-offs, what's next |

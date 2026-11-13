@@ -106,7 +106,8 @@ def r2(x):
 
 
 # ============================================================ run orchestration
-def start_run(pdf_bytes: bytes, filename: str, source: str) -> str:
+def start_run(pdf_bytes: bytes, filename: str, source: str, manual: dict | None = None) -> str:
+    """Start a run in the background. `manual` = fields a person keyed in (skips the AI read, every rule still runs)."""
     run_id = datetime.now().strftime("R%y%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
     db.put_file(run_id, pdf_bytes)
     db.insert_run({"id": run_id, "created_at": db.now_iso(), "filename": filename, "source": source,
@@ -114,7 +115,7 @@ def start_run(pdf_bytes: bytes, filename: str, source: str) -> str:
                    "trace_json": "{}", "events_json": "[]"})
     with LIVE_LOCK:
         LIVE[run_id] = []
-    threading.Thread(target=_run, args=(run_id, pdf_bytes, filename), daemon=True).start()
+    threading.Thread(target=_run, args=(run_id, pdf_bytes, filename, manual), daemon=True).start()
     return run_id
 
 
@@ -140,11 +141,11 @@ def _persist_events(run_id: str, trace: dict) -> None:
     db.update_run(run_id, events_json=json.dumps(evs, default=str), trace_json=json.dumps(trace, default=str))
 
 
-def _run(run_id: str, pdf: bytes, filename: str) -> None:
+def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None) -> None:
     import json
     t_start = time.time()
     ctx = {"run_id": run_id, "pdf": pdf, "filename": filename, "policy": db.get_policy(),
-           "master": db.master(), "trace": {"stages": {}}}
+           "master": db.master(), "trace": {"stages": {}}, "manual": manual}
     trace = ctx["trace"]
     _emit(run_id, "run_start", stages=[{"key": k, "label": l} for k, l in STAGES], policy=ctx["policy"])
     try:
@@ -229,6 +230,34 @@ def human_action(run_id: str, action: str, actor: str, note: str) -> dict:
     else:
         raise ValueError("unknown action")
     return db.get_run(run_id)
+
+
+MANUAL_FIELDS = ("vendor_name", "invoice_number", "invoice_date", "due_date", "po_reference", "payment_terms", "currency",
+                 "vendor_email", "subtotal", "tax_amount", "shipping_amount", "total_amount", "line_items")
+
+
+def rekey(run_id: str, fields: dict, actor: str, note: str) -> str:
+    """A reviewer corrects or types in the invoice fields; the document is re-checked as a new run.
+    The original is marked 'corrected' (superseded), keeps its own trace, and both are linked in the audit trail."""
+    run = db.get_run(run_id)
+    if not run:
+        raise ValueError("run not found")
+    if run["decision"] != "HOLD" or run.get("review_status") not in (None, "pending"):
+        raise ValueError("only invoices waiting for review can be corrected")
+    if not note.strip():
+        raise ValueError("a note is required. It goes into the audit trail.")
+    clean = {k: fields.get(k) for k in MANUAL_FIELDS}
+    if not clean.get("invoice_number") or not clean.get("total_amount"):
+        raise ValueError("at least the invoice number and the total are needed")
+    f = db.get_file(run_id)
+    if not f:
+        raise ValueError("the original document is no longer stored")
+    clean["_actor"] = actor
+    new_id = start_run(f[0], run["filename"], f"re-keyed from {run_id}", manual=clean)
+    db.update_run(run_id, review_status="corrected")
+    db.add_audit(run_id, actor, "corrected", f"{note} → re-checked as {new_id}")
+    db.add_audit(new_id, actor, "keyed_in", f"Corrected from {run_id}: {note}")
+    return new_id
 
 
 # ============================================================ stages
@@ -334,7 +363,15 @@ def st_analyze(ctx):
 
 def st_extract(ctx):
     checks, meta, data, notes = [], None, None, []
-    if llm_available():
+    if ctx.get("manual"):
+        m = ctx["manual"]
+        data = {k: v for k, v in m.items() if k not in ("_actor",)}
+        keyed = [k for k, v in data.items() if v not in (None, "", [])]
+        data["field_confidence"] = {k: 1.0 for k in keyed}  # a person read it off the document
+        data.setdefault("document_type", "invoice")
+        meta = {"extractor": "manual", "model": None, "latency_ms": 0}
+        notes.append(f"Keyed in by {m.get('_actor') or 'a reviewer'}. The AI read was skipped; every rule still runs.")
+    elif llm_available():
         try:
             data, meta = extract_with_gemini(ctx["pdf"], ctx.get("text", ""))
             db.cache_put(ctx["sha"], "gemini", data)

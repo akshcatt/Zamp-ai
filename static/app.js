@@ -4,6 +4,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const app = $("#app");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (x) => (x == null ? "—" : "$" + Number(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const cmoney = (x) => (x == null ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1000 ? "$" + (x / 1000).toFixed(1) + "k" : "$" + Math.round(x));
 const kmoney = (x) => (x == null ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e4 ? "$" + (x / 1000).toFixed(1) + "k" : money(x));
 const toDate = (iso) => new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
 const when = (iso) => (iso ? toDate(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
@@ -16,11 +17,19 @@ const ago = (iso) => {
   return Math.floor(s / 86400) + " d ago";
 };
 const secs = (ms) => (ms == null ? "" : ms < 1000 ? ms + " ms" : (ms / 1000).toFixed(1) + " s");
+const session = { auth: false, user: null, csrf: null };
+const store = { get: (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+const reviewer = () => session.user || store.get("clearap-reviewer") || "";
 const api = async (path, opts = {}) => {
-  const r = await fetch(path, opts);
-  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  const method = (opts.method || "GET").toUpperCase();
+  const headers = { ...(opts.headers || {}) };
+  if (method !== "GET" && session.csrf) headers["X-CSRF-Token"] = session.csrf;
+  const r = await fetch(path, { ...opts, headers });
+  if (r.status === 401) { location.href = "/login"; throw new Error("Please sign in again."); }
+  if (!r.ok) { let m = r.statusText; try { const j = await r.json(); m = typeof j.detail === "string" ? j.detail : (j.detail?.[0]?.msg || m); } catch {} throw new Error(m); }
   return r.json();
 };
+const postJSON = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), 2600); };
 const tip = (text) => `<span class="tip" tabindex="0" data-tip="${esc(text)}">?</span>`;
 const icon = {
@@ -32,6 +41,9 @@ const icon = {
   play: `<svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg>`,
   sun: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
   moon: `<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>`,
+  user: `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>`,
+  flag: `<svg viewBox="0 0 24 24"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg>`,
 };
 
 /* ------------------------------------------------------------------ plain-language vocabulary */
@@ -68,6 +80,7 @@ const MANUAL_MIN = { APPROVE: 12, REJECT: 10, HOLD: 5 }; // assumed minutes of m
 
 const decBadge = (d, review, status) => {
   if (!d || status === "running") return `<span class="badge running">Working…</span>`;
+  if (review === "corrected") return `<span class="badge info">Corrected · re-checked</span>`;
   if (d === "HOLD" && review && review !== "pending")
     return `<span class="badge ${review === "approved" ? "APPROVE" : "REJECT"}">${review === "approved" ? "Approved by reviewer" : "Rejected by reviewer"}</span>`;
   return `<span class="badge ${d}">${DEC_LABEL[d] || d}</span>`;
@@ -105,6 +118,7 @@ const routes = [
   [/^#\/runs\/([\w-]+)(?:\?(.*))?$/, viewRun, null],
   [/^#\/queue$/, viewQueue, "queue"],
   [/^#\/data$/, viewData, "data"],
+  [/^#\/vendors$/, viewVendors, "vendors"],
   [/^#\/rules$/, viewRules, "rules"],
 ];
 async function router() {
@@ -133,6 +147,20 @@ async function refreshChrome() {
     const q = $("#queue-count");
     q.hidden = !s.pending_review; q.textContent = s.pending_review;
   } catch {}
+  paintWho();
+}
+function paintWho() {
+  const w = $("#who");
+  if (session.auth) {
+    w.innerHTML = `${icon.user}<span>${esc(session.user)}</span>`;
+    w.title = "Signed in. Click to sign out.";
+    w.onclick = async () => { if (!confirm("Sign out?")) return; await fetch("/logout", { method: "POST", headers: { "X-CSRF-Token": session.csrf } }); location.href = "/login"; };
+  } else {
+    const n = store.get("clearap-reviewer");
+    w.innerHTML = `${icon.user}<span>${n ? esc(n) : "Set your name"}</span>`;
+    w.title = "Your name is recorded on every review you make";
+    w.onclick = () => { const v = prompt("Your name (recorded on every review you make):", n); if (v != null) { store.set("clearap-reviewer", v.trim().slice(0, 60)); paintWho(); } };
+  }
 }
 
 /* ------------------------------------------------------------------ dashboard */
@@ -204,7 +232,8 @@ async function viewDashboard() {
         <div class="toolbar">
           <label class="search">${icon.search}<input id="q" placeholder="Search vendor, invoice #, PO" value="${esc(dash.q)}"></label>
           <div class="chips" id="chips">${[["all", "All"], ["APPROVE", "Approved"], ["HOLD", "Needs review"], ["REJECT", "Rejected"]].map(([k, l]) => `<button data-f="${k}" class="${dash.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
-          <button class="btn sm ghost" id="csv" title="Download as a spreadsheet (CSV)">${icon.download} Export</button>
+          <div class="menu"><button class="btn sm ghost" id="exp" aria-haspopup="true">${icon.download} Export</button>
+            <div class="menu-pop" id="exp-pop" hidden><a href="/api/export.xlsx" download>Excel workbook <span class="faint">invoices, exceptions, ledger</span></a><a href="/api/export.csv" download>CSV <span class="faint">one row per invoice</span></a><button type="button" id="csv">CSV of this filtered view</button></div></div>
         </div></div>
       <div id="runs-table"></div>
     </div>
@@ -224,6 +253,8 @@ async function viewDashboard() {
     </div>
   </div>`;
 
+  const filtered = () => { const q = dash.q.trim().toLowerCase(); return runs.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
+      && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to)].join(" ").toLowerCase().includes(q))); };
   const paint = () => {
     const q = dash.q.trim().toLowerCase();
     const rows = runs.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
@@ -243,7 +274,9 @@ async function viewDashboard() {
   paint();
   $("#q").oninput = (e) => { dash.q = e.target.value; paint(); };
   $("#chips").onclick = (e) => { const f = e.target.dataset.f; if (!f) return; dash.filter = f; $$("#chips button").forEach((b) => b.classList.toggle("on", b.dataset.f === f)); paint(); };
-  $("#csv").onclick = () => exportCsv(runs);
+  $("#exp").onclick = (e) => { e.stopPropagation(); $("#exp-pop").hidden = !$("#exp-pop").hidden; };
+  document.addEventListener("click", () => { const m = $("#exp-pop"); if (m) m.hidden = true; }, { once: true });
+  $("#csv").onclick = () => exportCsv(filtered());
   $$("[data-view]").forEach((b) => (b.onclick = () => {
     const id = b.dataset.view; dash.tables[id] = !dash.tables[id];
     const card = b.closest(".chart-card");
@@ -310,7 +343,7 @@ function activityChart(tl) {
   const chart = `<div class="cols-chart" role="img" aria-label="Invoices per ${dur(step / 1000)} by result">
     <div class="y-axis"><span>${top}</span><span>${top / 2 % 1 ? "" : top / 2}</span><span>0</span></div>
     <div class="plot"><div class="grid-lines"><i></i><i></i><i></i></div>
-      <div class="cols">${buckets.map((b, i) => { const n = b.APPROVE + b.HOLD + b.REJECT;
+      <div class="col-bars">${buckets.map((b, i) => { const n = b.APPROVE + b.HOLD + b.REJECT;
         const tipTxt = `<b>${lab(b.t)}</b><br>${n} invoice${n === 1 ? "" : "s"} · ${money(b.total)}${OUT.map(([k, l]) => (b[k] ? `<br>${l}: ${b[k]}` : "")).join("")}`;
         return `<div class="col" data-ct="${esc(tipTxt)}"><div class="area"><div class="stack" style="height:${(100 * n) / top}%">${OUT.map(([k, , c]) => (b[k] ? `<span style="flex:${b[k]};background:${c}"></span>` : "")).join("")}</div></div>
           <div class="x">${i % every === 0 ? lab(b.t) : ""}</div></div>`; }).join("")}</div></div></div>`;
@@ -414,12 +447,13 @@ async function viewInbox() {
   const kindCls = (k) => (k.startsWith("Edge") ? "edge" : "");
   app.innerHTML = `
   <div class="page-head">
-    <div><span class="eyebrow">Upload</span><h1>Drop in an invoice</h1><p>Any invoice works: a PDF, a scan, or a photo taken on a phone. You'll watch every check happen live, in order.</p></div>
+    <div><span class="eyebrow">Upload</span><h1>Drop in an invoice</h1><p>Any invoice works: a PDF, a scan, or a photo taken on a phone. Drop one to watch every check live, or drop a whole batch (up to 25) and track them together.</p></div>
   </div>
-  <label class="drop" id="drop"><input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/heic,.heic,.jpg,.jpeg,.png,.webp" hidden>
+  <label class="drop" id="drop"><input type="file" id="file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/heic,.heic,.jpg,.jpeg,.png,.webp" hidden>
     <span class="ic">${icon.upload}</span>
-    <b>Drag an invoice here, or click to choose</b><span class="muted">Up to 20 MB. Photos are straightened and turned into a PDF automatically.</span>
+    <b>Drag invoices here, or click to choose</b><span class="muted">One file opens the live view. Several files run as a batch. Up to 20 MB each; photos are straightened automatically.</span>
     <span class="formats"><span>PDF</span><span>JPG</span><span>PNG</span><span>WEBP</span><span>HEIC</span></span></label>
+  <div id="batch"></div>
   <div class="sec-head"><div><h2>Sample inbox</h2><div class="muted small">Real-looking invoices, each built to test something different. Try them in order for the demo.</div></div>
     <button class="btn" id="runall">${icon.play} Run all ${samples.length}</button></div>
   <div class="grid samples">${samples.map((s) => { const last = lastBy[s.file]; return `
@@ -432,10 +466,11 @@ async function viewInbox() {
     </div>`; }).join("")}</div>`;
   $$("[data-run]").forEach((b) => (b.onclick = () => runSample(b.dataset.run)));
   const drop = $("#drop"), file = $("#file");
-  file.onchange = () => file.files[0] && upload(file.files[0]);
+  const take = (list) => { const fs = [...list]; if (!fs.length) return; fs.length === 1 ? upload(fs[0]) : uploadBatch(fs); };
+  file.onchange = () => { take(file.files); file.value = ""; };
   ["dragenter", "dragover"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", (ev) => ev.dataTransfer.files[0] && upload(ev.dataTransfer.files[0]));
+  drop.addEventListener("drop", (ev) => take(ev.dataTransfer.files));
   $("#runall").onclick = async () => {
     const b = $("#runall"); b.disabled = true;
     for (const [i, s] of samples.entries()) {
@@ -451,6 +486,34 @@ async function runSample(name) {
   const fd = new FormData(); fd.append("sample", name);
   const { run_id } = await api("/api/runs", { method: "POST", body: fd });
   location.hash = `#/runs/${run_id}`;
+}
+async function uploadBatch(files) {
+  if (files.length > 25) { toast("Up to 25 files at a time"); files = files.slice(0, 25); }
+  const box = $("#batch");
+  const fd = new FormData(); files.forEach((f) => fd.append("files", f));
+  box.innerHTML = `<div class="card panel batch"><div class="panel-head"><span class="t">Uploading ${files.length} files…</span></div></div>`;
+  let res;
+  try { res = (await api("/api/runs/batch", { method: "POST", body: fd })).runs; } catch (e) { box.innerHTML = ""; toast(e.message); return; }
+  const track = async () => {
+    if (!$("#batch")) return; // left the page
+    const all = await api("/api/runs");
+    const byId = Object.fromEntries(all.map((r) => [r.id, r]));
+    const rows = res.map((x) => ({ ...x, r: x.run_id ? byId[x.run_id] : null }));
+    const done = rows.filter((x) => x.error || (x.r && x.r.status !== "running")).length;
+    const tally = { APPROVE: 0, HOLD: 0, REJECT: 0 };
+    rows.forEach((x) => x.r && x.r.status !== "running" && tally[x.r.decision]++);
+    $("#batch").innerHTML = `<div class="card panel batch">
+      <div class="panel-head"><div><span class="t">Batch · ${done} of ${rows.length} done</span>
+        <div class="faint small">${tally.APPROVE} approved · ${tally.HOLD} need review · ${tally.REJECT} rejected</div></div>
+        <div class="progress" style="min-width:160px"><span style="width:${(100 * done) / rows.length}%"></span></div></div>
+      <div class="table-wrap"><table><tbody>${rows.map((x) => `<tr class="${x.run_id ? "click" : ""}" ${x.run_id ? `onclick="location.hash='#/runs/${x.run_id}'"` : ""}>
+        <td><b style="font-weight:500">${esc(x.r?.vendor_name || x.filename)}</b><div class="faint mono">${esc(x.filename)}</div></td>
+        <td>${x.error ? `<span class="badge fail">${esc(x.error)}</span>` : decBadge(x.r?.decision, x.r?.review_status, x.r?.status || "running")}</td>
+        <td class="muted">${esc(x.r && x.r.status !== "running" ? friendly(x.r.route_to) : x.error ? "Not processed" : "Checking now…")}</td>
+        <td class="num">${money(x.r?.total)}</td></tr>`).join("")}</tbody></table></div></div>`;
+    if (done < rows.length) setTimeout(track, 1200); else { toast(`Batch finished: ${tally.APPROVE} approved, ${tally.HOLD} to review, ${tally.REJECT} rejected`); refreshChrome(); }
+  };
+  track();
 }
 async function upload(f) {
   toast(`Uploading ${f.name}…`);
@@ -502,7 +565,7 @@ async function viewRun(id, query) {
     r = r || (await api(`/api/runs/${id}`));
     st.run = r; st.running = false;
     $("#rh-title").textContent = r.vendor_name ? `${r.vendor_name} · ${r.invoice_number || "no invoice #"}` : r.filename;
-    $("#rh-meta").innerHTML = `${esc(r.filename)} · received ${when(r.created_at)} · checked in ${secs(r.duration_ms)} · read by <b>${esc(r.extractor === "gemini" ? "Gemini AI" : r.extractor || "n/a")}</b>`;
+    $("#rh-meta").innerHTML = `${esc(r.filename)} · received ${when(r.created_at)} · checked in ${secs(r.duration_ms)} · read by <b>${esc(READER_NAME[r.extractor] || r.extractor || "nobody yet (needs keying)")}</b>`;
     render(); renderReview(st); refreshChrome();
   };
 
@@ -674,24 +737,70 @@ const QUICK_NOTES = {
 };
 function renderReview(st) {
   const el = $("#review"), r = st.run;
+  const replacedBy = r.review_status === "corrected" && ((r.audit || []).map((a) => (a.note || "").match(/re-checked as (R[\w-]+)/)).find(Boolean) || [])[1];
+  const fromRun = (r.source || "").match(/re-keyed from (R[\w-]+)/)?.[1];
+  const links = replacedBy ? `<div class="notice">This invoice was corrected by a reviewer and re-checked. <a href="#/runs/${replacedBy}">Open the corrected version →</a></div>`
+    : fromRun ? `<div class="notice">These details were typed in by a reviewer from the document. <a href="#/runs/${fromRun}">See the original attempt →</a></div>` : "";
   const audit = (r.audit || []).length ? `<div class="card pad" style="margin-top:16px"><h3>History</h3><ul class="audit">${r.audit.map((a) => `<li><span class="mono faint">${when(a.ts)}</span> · <b>${esc(a.actor)}</b> · ${esc(a.action.replace(/_/g, " "))}${a.note ? `: ${esc(a.note)}` : ""}</li>`).join("")}</ul></div>` : "";
   const pending = r.decision === "HOLD" && (!r.review_status || r.review_status === "pending");
   const notes = QUICK_NOTES[r.route_to] || [];
-  el.innerHTML = (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
+  el.innerHTML = links + (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
       <p class="muted small" style="margin:0 0 10px">${esc(TEAM_WHY[r.route_to] || "")}</p>
       <textarea id="note" placeholder="Required: what did you check, and why are you approving or rejecting it? This is saved to the history."></textarea>
       ${notes.length ? `<div class="quick">${notes.map((n) => `<button type="button" data-n="${esc(n)}">${esc(n.length > 58 ? n.slice(0, 56) + "…" : n)}</button>`).join("")}</div>` : ""}
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ok" id="ap">Approve &amp; record</button><button class="btn bad" id="rj">Reject</button></div></div></div>` : "") + audit;
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn ok" id="ap">Approve &amp; record</button><button class="btn bad" id="rj">Reject</button>
+        <button class="btn ghost" id="fix">${icon.edit} Correct details &amp; re-check</button>
+        <span class="faint small" style="margin-left:auto">Recorded as <b>${esc(reviewer() || "AP Reviewer")}</b></span></div></div></div>
+      <div id="fix-form"></div>` : "") + audit;
   if (pending) {
     $$(".quick button", el).forEach((b) => (b.onclick = () => { $("#note").value = b.dataset.n; $("#note").focus(); }));
     const act = async (action) => {
-      try { st.run = await api(`/api/runs/${r.id}/action`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, note: $("#note").value }) });
+      try { st.run = await postJSON(`/api/runs/${r.id}/action`, { action, note: $("#note").value, actor: reviewer() });
         toast(action === "approve" ? "Approved and recorded" : "Rejected"); renderReview(st); refreshChrome(); }
       catch (e) { toast(e.message); }
     };
     $("#ap").onclick = () => act("approve"); $("#rj").onclick = () => act("reject");
+    $("#fix").onclick = () => renderFixForm(st);
   }
 }
+
+/* Correct & re-check: a person types or fixes the fields; the document re-runs through every rule. */
+function renderFixForm(st) {
+  const box = $("#fix-form");
+  if (box.innerHTML) { box.innerHTML = ""; return; }
+  const f = st.stages.extract?.data?.fields || {};
+  const lines = (f.line_items || []).length ? f.line_items : [{ description: "", quantity: null, unit_price: null, amount: null }];
+  const inp = (k, l, type = "text", wide = false) => `<label class="${wide ? "wide" : ""}">${l}<input name="${k}" type="${type}" ${type === "number" ? 'step="0.01"' : ""} value="${esc(f[k] ?? "")}"></label>`;
+  box.innerHTML = `<div class="card pad fix" style="margin-top:16px">
+    <h3>Correct the details</h3><p class="muted small" style="margin:-4px 0 14px">Type what's on the document (use the <b>Side by side</b> tab). The invoice is then re-checked from scratch: vendor, repeats, order match, everything. The AI read is skipped; the rules are not.</p>
+    <form id="fixf" class="fix-grid">
+      ${inp("vendor_name", "Vendor", "text", true)}${inp("invoice_number", "Invoice #")}${inp("invoice_date", "Invoice date", "date")}
+      ${inp("po_reference", "PO number")}${inp("due_date", "Due date", "date")}${inp("payment_terms", "Payment terms")}
+      ${inp("subtotal", "Subtotal", "number")}${inp("tax_amount", "Tax", "number")}${inp("shipping_amount", "Shipping", "number")}${inp("total_amount", "Total", "number")}
+    </form>
+    <div class="sect"><h3>Line items</h3><div class="table-wrap"><table class="lines"><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th><th></th></tr></thead>
+      <tbody id="lines">${lines.map(lineRow).join("")}</tbody></table></div>
+      <button class="btn sm ghost" id="addl" type="button">+ Add line</button></div>
+    <label class="note-label">Why are you correcting it?<textarea id="fixnote" placeholder="e.g. Scan was unreadable; typed from the paper copy."></textarea></label>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="fixgo">Re-check with these details</button><button class="btn ghost" id="fixcancel">Cancel</button></div></div>`;
+  $("#addl").onclick = () => $("#lines").insertAdjacentHTML("beforeend", lineRow({}));
+  $("#lines").onclick = (e) => { if (e.target.closest(".rm")) e.target.closest("tr").remove(); };
+  $("#lines").oninput = (e) => { const tr = e.target.closest("tr"); const [q, u, a] = ["quantity", "unit_price", "amount"].map((n) => tr.querySelector(`[name=${n}]`));
+    if (e.target !== a && q.value && u.value) a.value = (Number(q.value) * Number(u.value)).toFixed(2); };
+  $("#fixcancel").onclick = () => (box.innerHTML = "");
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+  $("#fixgo").onclick = async () => {
+    const fd = new FormData($("#fixf")), body = { note: $("#fixnote").value, actor: reviewer() };
+    for (const [k, v] of fd.entries()) body[k] = ["subtotal", "tax_amount", "shipping_amount", "total_amount"].includes(k) ? (v === "" ? null : Number(v)) : v;
+    body.line_items = [...$$("#lines tr")].map((tr) => { const g = (n) => tr.querySelector(`[name=${n}]`).value; const num = (n) => (g(n) === "" ? null : Number(g(n)));
+      return { description: g("description"), quantity: num("quantity"), unit_price: num("unit_price"), amount: num("amount") }; }).filter((l) => l.description || l.amount != null);
+    try { const { run_id } = await postJSON(`/api/runs/${st.run.id}/rekey`, body); toast("Re-checking with the corrected details…"); location.hash = `#/runs/${run_id}`; }
+    catch (e) { toast(e.message); }
+  };
+}
+const lineRow = (l) => `<tr><td><input name="description" value="${esc(l.description ?? "")}"></td><td><input name="quantity" type="number" step="any" value="${l.quantity ?? ""}"></td>
+  <td><input name="unit_price" type="number" step="0.01" value="${l.unit_price ?? ""}"></td><td><input name="amount" type="number" step="0.01" value="${l.amount ?? ""}"></td>
+  <td><button type="button" class="rm" title="Remove line" aria-label="Remove line">×</button></td></tr>`;
 
 /* ------------------------------------------------------------------ queue */
 async function viewQueue() {
@@ -703,10 +812,33 @@ async function viewQueue() {
   app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Needs review</span><h1>${runs.length ? `${runs.length} invoice${runs.length === 1 ? "" : "s"} need${runs.length === 1 ? "s" : ""} a person` : "Nothing to review"}</h1>
     <p>Only the unusual ones end up here. Each goes to the team best placed to sort it out, with the evidence already attached${late ? `. <b style="color:var(--bad)">${late} past deadline.</b>` : "."}</p></div></div>
   ${runs.length ? Object.values(QUEUE_KEYS).filter((q) => groups[q]).map((q) => `<div class="card panel q-group">
-    <div class="panel-head"><div><div class="t">${esc(friendly(q))} <span class="badge HOLD">${groups[q].length} waiting</span></div><div class="faint small" style="margin-top:2px">${esc(TEAM_WHY[q] || "")}</div></div></div>
+    <div class="panel-head"><label class="selall"><input type="checkbox" data-group="${esc(q)}" aria-label="Select all in ${esc(friendly(q))}">
+      <div><div class="t">${esc(friendly(q))} <span class="badge HOLD">${groups[q].length} waiting</span></div><div class="faint small" style="margin-top:2px">${esc(TEAM_WHY[q] || "")}</div></div></label></div>
     <div class="table-wrap"><table><tbody>${groups[q].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((r) => { const sl = slaState(r);
-      return `<tr class="click" onclick="location.hash='#/runs/${r.id}'"><td style="width:26%"><b style="font-weight:500">${esc(r.vendor_name || r.filename)}</b><div class="faint mono">${esc(r.invoice_number || "")}</div></td><td class="muted">${esc(r.headline)}</td><td class="num">${money(r.total)}</td><td class="num"><span class="sla-chip ${sl.cls}">${sl.text}</span></td></tr>`; }).join("")}</tbody></table></div></div>`).join("")
-    : `<div class="card empty"><div class="big">You're all caught up</div>When an invoice needs a person, it will show up here.</div>`}`;
+      return `<tr class="click" data-open="${r.id}"><td class="pick"><input type="checkbox" value="${r.id}" data-g="${esc(q)}" aria-label="Select ${esc(r.vendor_name || r.filename)}"></td>
+        <td style="width:26%"><b style="font-weight:500">${esc(r.vendor_name || r.filename)}</b><div class="faint mono">${esc(r.invoice_number || "")}</div></td><td class="muted">${esc(r.headline)}</td><td class="num">${money(r.total)}</td><td class="num"><span class="sla-chip ${sl.cls}">${sl.text}</span></td></tr>`; }).join("")}</tbody></table></div></div>`).join("")
+    : `<div class="card empty"><div class="big">You're all caught up</div>When an invoice needs a person, it will show up here.</div>`}
+  <div class="bulkbar" id="bulkbar" hidden><b id="bulkn"></b>
+    <input id="bulknote" placeholder="Note for the history (required)" maxlength="1000">
+    <button class="btn sm ok" data-bulk="approve">Approve</button><button class="btn sm bad" data-bulk="reject">Reject</button>
+    <button class="btn sm ghost" id="bulkclear">Clear</button></div>`;
+  const picked = () => $$("input[type=checkbox][value]:checked").map((i) => i.value);
+  const sync = () => { const n = picked().length; $("#bulkbar").hidden = !n; $("#bulkn").textContent = `${n} selected`; };
+  $$("tr[data-open]").forEach((tr) => (tr.onclick = (e) => { if (!e.target.closest(".pick")) location.hash = `#/runs/${tr.dataset.open}`; }));
+  $$("input[type=checkbox][value]").forEach((c) => (c.onchange = sync));
+  $$("input[data-group]").forEach((c) => (c.onchange = () => { $$(`input[data-g="${CSS.escape(c.dataset.group)}"]`).forEach((x) => (x.checked = c.checked)); sync(); }));
+  $("#bulkclear") && ($("#bulkclear").onclick = () => { $$("input[type=checkbox]").forEach((c) => (c.checked = false)); sync(); });
+  $$("[data-bulk]").forEach((b) => (b.onclick = async () => {
+    const ids = picked(), note = $("#bulknote").value.trim();
+    if (!note) { toast("Add a note first. It goes into each invoice's history."); $("#bulknote").focus(); return; }
+    if (!confirm(`${b.dataset.bulk === "approve" ? "Approve" : "Reject"} ${ids.length} invoice${ids.length === 1 ? "" : "s"}?`)) return;
+    try {
+      const res = await postJSON("/api/runs/bulk-action", { run_ids: ids, action: b.dataset.bulk, note, actor: reviewer() });
+      const why = res.results.find((x) => !x.ok)?.error;
+      toast(`${res.done} done${res.failed ? ` · ${res.failed} couldn't be (${why})` : ""}`);
+      viewQueue();
+    } catch (e) { toast(e.message); }
+  }));
 }
 
 /* ------------------------------------------------------------------ data */
@@ -733,6 +865,33 @@ async function viewData() {
   <div class="card panel" style="margin-top:16px"><div class="panel-head"><span class="t">Vendors</span></div><div class="table-wrap"><table>
     <thead><tr><th>ID</th><th>Name</th><th>Tax ID</th><th>Status</th><th>Terms</th><th>Bank on file</th><th>Email domain</th><th>Phone on file</th></tr></thead>
     <tbody>${d.vendors.map((v) => `<tr><td class="mono">${esc(v.vendor_id)}</td><td>${esc(v.legal_name)}</td><td class="mono">${esc(v.tax_id)}</td><td><span class="badge ${v.status === "active" ? "pass" : "fail"}">${esc(v.status)}</span></td><td>${esc(v.payment_terms)}</td><td>${esc(v.bank)}</td><td class="mono">${esc(v.email_domain)}</td><td class="mono">${esc(v.phone_on_file)}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+/* ------------------------------------------------------------------ vendors */
+async function viewVendors() {
+  const { vendors, unknown } = await api("/api/vendors");
+  refreshChrome();
+  const maxSpend = Math.max(1, ...vendors.map((v) => v.approved_spend));
+  const flagged = vendors.filter((v) => v.flags.length).length;
+  app.innerHTML = `<div class="page-head"><div><span class="eyebrow">Vendors</span><h1>Who's billing you</h1>
+    <p>Every vendor on file, with what they've sent, what was paid, what's waiting, and anything that looked wrong. Profiles are built from the invoices processed here; approving a new vendor still happens in vendor setup.</p></div>
+    <div class="actions"><span class="attn ${flagged ? "" : "ok"}"><b>${flagged}</b>${flagged === 1 ? "vendor needs" : "vendors need"} attention</span></div></div>
+  <div class="grid vendor-grid">${vendors.map((v) => `<div class="card vendor ${v.flags.length ? "flagged" : ""}">
+      <div class="v-head"><div style="min-width:0"><div class="v-name">${esc(v.name)}</div><div class="faint mono small">${esc(v.vendor_id)} · ${esc(v.terms)} · ${esc(v.email_domain)}</div></div>
+        <span class="badge ${v.status === "active" ? "pass" : "fail"}">${v.status === "active" ? "Active" : "Blocked"}</span></div>
+      ${v.flags.length ? `<div class="v-flags">${v.flags.map((f) => `<span>${icon.flag}${esc(f)}</span>`).join("")}</div>` : ""}
+      <div class="v-stats">
+        <div><b>${v.invoices}</b><span>invoices here</span></div>
+        <div><b>${cmoney(v.approved_spend)}</b><span>approved</span></div>
+        <div><b>${v.waiting}</b><span>waiting</span></div>
+        <div><b>${v.rejected}</b><span>rejected</span></div></div>
+      <div class="hbar-track v-track" title="Approved spend compared with your top vendor">${v.approved_spend ? `<span style="width:${(100 * v.approved_spend) / maxSpend}%;background:var(--c-bar)"></span>` : ""}</div>
+      <dl class="kv small" style="margin-top:12px"><dt>Open orders</dt><dd>${v.open_pos} · ${v.open_po_balance < 0 ? `billed ${money(-v.open_po_balance)} over (within tolerance)` : `${money(v.open_po_balance)} left to bill`}</dd>
+        <dt>Paid to</dt><dd>${esc(v.bank)} <span class="faint">(only this account is ever paid)</span></dd>
+        <dt>Billed to date</dt><dd>${money(v.lifetime_billed)}</dd><dt>Last invoice</dt><dd>${v.last_seen ? ago(v.last_seen) : "—"}</dd></dl>
+    </div>`).join("")}</div>
+  ${unknown.length ? `<div class="card panel" style="margin-top:16px"><div class="panel-head"><span class="t">Not on file</span><span class="faint small">Senders we couldn't match to a vendor. They go to the vendor setup team.</span></div>
+    <div class="table-wrap"><table><tbody>${unknown.map((u) => `<tr><td>${esc(u.name)}</td><td class="num">${u.invoices} invoice${u.invoices === 1 ? "" : "s"}</td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
 }
 
 /* ------------------------------------------------------------------ rules */
@@ -769,6 +928,12 @@ async function viewRules() {
     <div class="card pad"><span class="badge HOLD">Needs review</span><p class="muted">A person needs to look. It goes to the team that can fix it: <b>fraud check</b> (bank changes), <b>finance manager</b> (large amounts), <b>purchasing</b> (order problems), <b>vendor setup</b> (unknown vendor), or <b>AP</b> (hard to read).</p></div>
     <div class="card pad"><span class="badge REJECT">Rejected</span><p class="muted">Must not be paid as sent: already billed, vendor blocked, not an invoice, or missing the invoice number or date. Vendors get a ready-to-send email explaining why.</p></div>
   </div>
+  <div class="grid quality" style="margin-top:16px">
+    <div class="card pad" id="bench"><h2>How accurate is it?</h2><div class="faint small">Loading…</div></div>
+    <div class="card pad"><h2>Check the AI connection</h2>
+      <p class="muted small" style="margin-top:-6px">Sends a one-word test to the model with the server's key, so you can confirm reading works before a demo. The key itself never leaves the server.</p>
+      <button class="btn" id="aitest">Run connection test</button><div id="aires" class="small" style="margin-top:12px"></div></div>
+  </div>
   <div class="card pad" style="margin-top:16px"><h2>Your rules</h2><p class="muted" style="margin:-6px 0 18px">Changes apply to the next invoice. Try setting the price wiggle room to 0.5% and re-running the Pinnacle sample: it flips from approved to needs review.</p>
     <form class="policy-form" id="pf">${fields.map(([k, l, h]) => `<label>${l}<input type="number" step="any" name="${k}" value="${p[k]}"><small>${h}</small></label>`).join("")}
       <label>Approve guessed POs automatically?<select name="inferred_po_auto_approve"><option value="true" ${p.inferred_po_auto_approve ? "selected" : ""}>Yes, if we're sure enough</option><option value="false" ${!p.inferred_po_auto_approve ? "selected" : ""}>No, always ask the buyer</option></select><small>Strict "no PO, no pay" companies pick No</small></label>
@@ -782,6 +947,24 @@ async function viewRules() {
       <li><b>People handle the exceptions, with context.</b> Every hold has an owner, a deadline, the evidence and a suggested next step. Every human action is recorded.</li></ul></div>
     <div class="card pad"><h2>Words you'll see</h2><dl class="glossary">${terms.map(([t, d]) => `<div><dt>${t}</dt><dd>${d}</dd></div>`).join("")}</dl></div>
   </div>`;
+  $("#aitest").onclick = async () => {
+    const b = $("#aitest"); b.disabled = true; b.textContent = "Testing…";
+    try {
+      const r = await postJSON("/api/ai/test", {});
+      $("#aires").innerHTML = r.ok ? `<span class="badge pass">Working</span> ${esc(r.model)} answered in ${secs(r.latency_ms)}.`
+        : `<span class="badge fail">Not working</span> <span class="muted">${esc(r.error)}</span>`;
+    } catch (e) { $("#aires").textContent = e.message; }
+    b.disabled = false; b.textContent = "Run connection test";
+  };
+  api("/api/benchmark").then((bm) => {
+    const el = $("#bench"); if (!el) return;
+    if (!bm.available) { el.innerHTML = `<h2>How accurate is it?</h2><p class="muted small">No benchmark yet. Run <code>scripts/benchmark.py</code> with a Gemini key.</p>`; return; }
+    el.innerHTML = `<h2>How accurate is it?</h2>
+      <p class="muted small" style="margin-top:-6px">Measured on ${esc(bm.run_on)} with ${esc(bm.model)}: every sample through the full process, then compared with the exact data each document was made from.</p>
+      <div class="bench-top"><div><b>${bm.fields_correct}/${bm.fields_total}</b><span>fields read correctly</span></div><div><b>${bm.decisions_correct}/${bm.samples}</b><span>right decision &amp; team</span></div><div><b>${bm.median_read_seconds ?? "—"} s</b><span>typical AI read</span></div></div>
+      ${hbars(bm.by_field.map((f) => ({ label: f.field, value: f.correct, tip: `${esc(f.field)}: ${f.correct}/${f.total}` })), { fmt: (v) => `${v}/${bm.samples}`, color: () => "var(--c-ok)" })}
+      <p class="faint small chart-note">Honest caveat: ${bm.samples} clean, generated documents is a smoke test, not proof. Real supplier invoices are messier; the next step is a labelled set of real (redacted) invoices.</p>`;
+  }).catch(() => {});
   $("#save").onclick = async () => {
     const fd = new FormData($("#pf")), body = {};
     for (const [k, v] of fd.entries()) body[k] = k === "inferred_po_auto_approve" ? v === "true" : Number(v);
@@ -795,7 +978,7 @@ const cmd = { items: [], shown: [], i: 0 };
 async function openCmd() {
   $("#cmd").hidden = false; const inp = $("#cmd-input"); inp.value = ""; inp.focus();
   cmd.items = [
-    ...[["Overview", "#/"], ["Upload an invoice", "#/inbox"], ["Needs review", "#/queue"], ["Records: orders, vendors, payments", "#/data"], ["How it works & rules", "#/rules"]].map(([t, h]) => ({ grp: "Go to", t, s: "", go: () => (location.hash = h) })),
+    ...[["Overview", "#/"], ["Upload an invoice", "#/inbox"], ["Needs review", "#/queue"], ["Vendors", "#/vendors"], ["Records: orders, vendors, payments", "#/data"], ["How it works & rules", "#/rules"]].map(([t, h]) => ({ grp: "Go to", t, s: "", go: () => (location.hash = h) })),
     { grp: "Actions", t: "Switch light / dark", s: "", go: () => $("#theme").click() },
   ];
   paintCmd();
@@ -831,5 +1014,8 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "Enter" && cmd.shown[cmd.i]) { e.preventDefault(); const it = cmd.shown[cmd.i]; closeCmd(); it.go(); }
 });
 
-refreshChrome();
-router();
+(async () => {
+  try { Object.assign(session, await (await fetch("/api/me")).json()); } catch {}
+  refreshChrome();
+  router();
+})();

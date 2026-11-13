@@ -2,3 +2,9 @@
 data
 __pycache__
 .git
+.env
+.env.*
+!.env.example
+.pytest_cache
+docs/EMAILS.md
+*.db

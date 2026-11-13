@@ -6,6 +6,8 @@
 2. `.venv/bin/python scripts/smoke_llm.py`. Every line must say PASS. It pauses between invoices to stay within free-tier rate limits. (It uses its own temporary database, so it won't touch the demo data.)
 3. On the Overview page, click **Reset demo data**. This gives you a clean ledger and empty history.
 4. The top-right badge must read **AI on · gemini-3.1-flash-lite** (green dot). If it says "AI off · basic reader", the key isn't loaded.
+   On the deployed site, **How it works → Run connection test** confirms the key works on the server.
+   Click **Set your name** in the top bar so your reviews are recorded under your name.
 5. Rules page: confirm the defaults (2%, $500, $25,000, 0.85, 0.70, 45, 180, Yes).
 6. Browser at 110–125% zoom, notifications off, one tab, other windows closed.
 
@@ -64,6 +66,15 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
   - Point: "The business owns the thresholds, not the code."
 - **If they send a phone photo:** drop it in too. JPG, PNG and iPhone HEIC are converted to a PDF at intake (sample 08 shows this).
 - **If they hand you a random invoice:** drop it in. An unknown vendor goes to Vendor Management (onboarding). A non-invoice is rejected. Either way it fails safe.
+- **Correct & re-check (if the AI is off, or a scan was misread):**
+  - Open the held invoice and click **Correct details & re-check**.
+  - Type the fields from the **Side by side** view, add a note, and submit.
+  - It re-runs through every rule as a new run. The original is kept and linked.
+  - Point: "People fix the reading, never the rules."
+- **Bulk review:** in Needs review, tick several invoices, add one note, and Approve or Reject. Each is still checked on its own, and one that can't be actioned is reported, not silently skipped.
+- **Vendors:** open Vendors to show the Keystone card flagged *Bank-change attempt seen* and Meridian flagged *Sent a repeat invoice*: risk by vendor, not just by invoice.
+- **Exports:** Overview → Export → Excel gives sheets for Summary, Invoices, every Exception, and the Ledger. That's what an AP lead hands to finance.
+- **Accuracy question:** How it works → *How accurate is it?* shows 80/80 fields and 8/8 decisions on the samples. Be upfront that this is a smoke test on clean generated documents; the next step is real redacted invoices.
 - **Free-tier limits:** if a run shows "rate limit reached", wait about 60 seconds. Don't click *Run all* during the live demo; run invoices one at a time.
 - **Backup if Wi-Fi or the API dies:** the app keeps running in heuristic mode for digital PDFs, and the scan goes to manual keying. Say so; that *is* the design. Every past run can be re-animated with **↻ Replay** from its event log.
 

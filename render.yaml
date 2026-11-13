@@ -3,12 +3,19 @@ services:
     name: clearap
     runtime: docker
     plan: free
-    healthCheckPath: /api/health
+    healthCheckPath: /healthz
     autoDeploy: true
     envVars:
       - key: PORT
         value: "10000"
-      - key: GEMINI_API_KEY
+      - key: GEMINI_API_KEY        # set in the Render dashboard; never committed
         sync: false
       - key: AP_TODAY
         value: "2026-11-12"
+      # Optional sign-in. Leave APP_USERNAME / APP_PASSWORD empty to keep the demo open.
+      - key: APP_USERNAME
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: APP_SECRET            # signs session cookies; generated once by Render
+        generateValue: true

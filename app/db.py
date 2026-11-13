@@ -123,6 +123,25 @@ def init(reset: bool = False) -> None:
             q("INSERT INTO policy (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING", (k, json.dumps(v)))
 
 
+def ping() -> bool:
+    try:
+        return q("SELECT 1 AS ok", fetch="one")["ok"] == 1
+    except Exception:
+        return False
+
+
+def recover_interrupted() -> list[str]:
+    """Runs still 'running' at startup were cut off by a restart or crash. Hold them for a person
+    instead of leaving them spinning forever, and record why in the audit trail."""
+    ids = [r["id"] for r in q("SELECT id FROM runs WHERE status = 'running'", fetch="all")]
+    for rid in ids:
+        q("UPDATE runs SET status = 'error', finished_at = ?, decision = 'HOLD', route_to = 'AP Specialist',"
+          " review_status = 'pending', headline = ? WHERE id = ?",
+          (now_iso(), "Processing was interrupted by a server restart. Nothing was paid; re-key it or upload it again.", rid))
+        add_audit(rid, "system", "interrupted", "Server restarted while this invoice was being processed.")
+    return ids
+
+
 def info() -> dict:
     """Storage summary for the UI: engine, file size, and row counts per table."""
     counts = {t: q(f"SELECT COUNT(*) AS n FROM {t}", fetch="one")["n"] for t in ("runs", "ledger", "audit", "files", "extraction_cache")}
@@ -191,8 +210,9 @@ def list_runs(limit: int = 200) -> list[dict]:
 
 
 def runs_with_sha(sha: str, exclude: str) -> list[dict]:
-    return q("SELECT id, created_at, decision, invoice_number FROM runs WHERE sha256 = ? AND id != ? AND status = 'done'",
-             (sha, exclude), fetch="all")
+    # A run a reviewer re-keyed ("corrected") is superseded by its replacement, so it is not a prior copy.
+    return q("SELECT id, created_at, decision, invoice_number FROM runs WHERE sha256 = ? AND id != ? AND status = 'done'"
+             " AND (review_status IS NULL OR review_status != 'corrected')", (sha, exclude), fetch="all")
 
 
 def open_runs_for_vendor(vendor_id: str, exclude: str) -> list[dict]:
