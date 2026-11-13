@@ -76,7 +76,7 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
 - **Archive:** Overview → **Archive finished** clears the board. Then re-run the clean invoice: it's still caught as a duplicate, because archiving never deletes history.
 - **Vendors:** open Vendors to show the Kesari card flagged *Bank-change attempt seen* and Meenakshi flagged *Sent a repeat invoice*: risk by vendor, not just by invoice.
 - **Exports:** Overview → Export → Excel gives sheets for Summary, Invoices, every Exception, and the Ledger. That's what an AP lead hands to finance.
-- **Accuracy question:** How it works → *How accurate is it?* shows 105/105 fields and 9/9 decisions on the samples. Be upfront that this is a smoke test on clean generated documents; the next step is real redacted invoices.
+- **Accuracy question:** How it works → *How accurate is it?* shows 166/166 fields and 12/12 decisions on the samples. Be upfront that this is a smoke test on clean generated documents; the next step is real redacted invoices.
 - **Free-tier limits:** if a run shows "rate limit reached", wait about 60 seconds. Don't click *Run all* during the live demo; run invoices one at a time.
 - **Backup if Wi-Fi or the API dies:** the app keeps running in heuristic mode for digital PDFs, and the scan goes to manual keying. Say so; that *is* the design. Every past run can be re-animated with **↻ Replay** from its event log.
 

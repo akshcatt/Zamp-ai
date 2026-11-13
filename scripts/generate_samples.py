@@ -22,7 +22,7 @@ from reportlab.pdfgen import canvas
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "samples"
 BILL_TO = ["Lumen Home Goods Pvt. Ltd.", "Accounts Payable, 4th Floor, Prestige Tech Park", "Outer Ring Road, Bengaluru 560103",
-           "GSTIN 29AAECL4821K1Z3"]
+           "GSTIN 29AAECL4821K1Z9"]
 
 
 def inr(x: float) -> str:
@@ -366,7 +366,7 @@ def totals(sub, gst=None, rate=18, ship=None, label_total="Total (INR)", note=No
     return rows
 
 
-SAHYADRI = "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058  ·  accounts@sahyadrisupplies.in  ·  GSTIN 29AAKCS3127M1Z6"
+SAHYADRI = "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058  ·  accounts@sahyadrisupplies.in  ·  GSTIN 29AAKCS3127M1ZV"
 SAMPLES = [
     {
         "file": "01_happy_sahyadri_SOS-58213.pdf",
@@ -397,7 +397,7 @@ SAMPLES = [
         "layout": "classic",
         "vendor_name": "Kaveri Cloud Solutions LLP",
         "vendor_address": "Office 902, Panchshil Tech Park, Yerwada, Pune, Maharashtra 411006",
-        "vendor_contact": "billing@kavericloud.in  ·  GSTIN 27AAPFK2210Q1Z9  ·  SAC 998313",
+        "vendor_contact": "billing@kavericloud.in  ·  GSTIN 27AAPFK2210Q1ZY  ·  SAC 998313",
         "meta": [("Bill Number", "KCS-INV-1209"), ("Date", "31 October 2026"), ("Your Ref", "PO-2026-0287"),
                  ("Period", "1 Oct - 31 Oct 2026"), ("Terms", "Net 30")],
         "col_desc": "Service", "col_qty": "Hours", "col_unit": "Rate (Rs.)",
@@ -417,7 +417,7 @@ SAMPLES = [
         "layout": "industrial", "scan": True,
         "vendor_name": "Ganga Freight Carriers Pvt. Ltd.",
         "vendor_address": "Gala 7, Rahnal Village, Bhiwandi, Thane, Maharashtra 421302",
-        "vendor_contact": "Tel +91 22 2851 0122  ·  billing@gangafreight.co.in  ·  GSTIN 27AAGCG4419R1Z2",
+        "vendor_contact": "Tel +91 22 2851 0122  ·  billing@gangafreight.co.in  ·  GSTIN 27AAGCG4419R1Z0",
         "doc_title": "FREIGHT INVOICE",
         "meta": [("Invoice No.", "GFC-30871"), ("Invoice Date", "08/11/2026"), ("Account", "LUMEN-BLR"), ("Terms", "Net 45")],
         "lines": [
@@ -438,7 +438,7 @@ SAMPLES = [
         "layout": "industrial",
         "vendor_name": "Meenakshi Industrial Spares Co.",
         "vendor_address": "112, SIDCO Industrial Estate, Ambattur, Chennai, Tamil Nadu 600098",
-        "vendor_contact": "ar@meenakshispares.com  ·  +91 44 2625 0190  ·  GSTIN 33AAHFM3098P1Z4",
+        "vendor_contact": "ar@meenakshispares.com  ·  +91 44 2625 0190  ·  GSTIN 33AAHFM3098P1ZP",
         "meta": [("Invoice No.", "INV-2026-0417"), ("Date", "08-OCT-2026"), ("Cust. PO", "PO-2026-0275"), ("Terms", "NET 30")],
         "col_desc": "Part / Description",
         "lines": [
@@ -460,7 +460,7 @@ SAMPLES = [
         "layout": "classic",
         "vendor_name": "Kesari Facility Services Pvt. Ltd.",
         "vendor_address": "No. 221, 5th Main, HSR Layout Sector 7, Bengaluru, Karnataka 560102",
-        "vendor_contact": "accounts@kesari-facility-billing.com  ·  +91 80 4718 0163  ·  GSTIN 29AAJCK5582N1Z8",
+        "vendor_contact": "accounts@kesari-facility-billing.com  ·  +91 80 4718 0163  ·  GSTIN 29AAJCK5582N1ZN",
         "meta": [("Bill Number", "KFS-2026-1147"), ("Date", "3 November 2026"), ("Your Ref", "PO-2026-0330"),
                  ("Terms", "Net 30")],
         "lines": [
@@ -480,7 +480,7 @@ SAMPLES = [
         "what_to_expect": "Approved with a note. The vendor added a ₹3,600 freight line that isn't on the PO. That's +0.78%, inside the 2% / ₹40,000 tolerance, so it passes without a human touch and the variance is logged.",
         "layout": "modern", "accent": "#7A3EF0",
         "vendor_name": "Pragati Print & Packaging",
-        "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099  ·  invoices@pragatiprint.in  ·  GSTIN 29ABBFP3374E1Z1",
+        "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099  ·  invoices@pragatiprint.in  ·  GSTIN 29ABBFP3374E1Z7",
         "meta": [("Invoice No.", "PPP-7734"), ("Invoice Date", "06.11.2026"), ("PO Number", "PO-2026-0356"),
                  ("Terms", "Net 30")],
         "lines": [
@@ -499,7 +499,7 @@ SAMPLES = [
         "what_to_expect": "Approved, with an issue reported to tick off. The missing invoice number and date don't block payment; they're flagged, and an email asking the vendor for them is drafted (GST input credit needs both). Repeats are still caught by seller, date and amount.",
         "layout": "modern", "accent": "#B54708",
         "vendor_name": "Annapurna Caterers",
-        "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038  ·  hello@annapurnacaterers.in  ·  GSTIN 29AQRPA4471H1Z5",
+        "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038  ·  hello@annapurnacaterers.in  ·  GSTIN 29AQRPA4471H1ZK",
         "meta": [("Event", "Lumen Q4 Town Hall"), ("Guests", "120"), ("PO Number", "PO-2026-0361")],
         "lines": [
             {"description": "Event catering - Q4 town hall, 120 guests", "qty": 1, "unit_price": 276000.00},
@@ -536,7 +536,7 @@ SAMPLES = [
         "layout": "industrial", "doc_title": "QUOTATION",
         "vendor_name": "Pragati Print & Packaging",
         "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
-        "vendor_contact": "sales@pragatiprint.in  ·  +91 80 2837 0148  ·  GSTIN 29ABBFP3374E1Z1",
+        "vendor_contact": "sales@pragatiprint.in  ·  +91 80 2837 0148  ·  GSTIN 29ABBFP3374E1Z7",
         "meta": [("Quote No.", "Q-2291"), ("Quote Date", "11 Nov 2026"), ("Valid Until", "11 Dec 2026"), ("Terms", "Net 30")],
         "lines": [
             {"description": "Custom mailer box 9x6x3, 1-colour", "qty": 5000, "unit_price": 73.60},
@@ -556,7 +556,7 @@ SAMPLES = [
         "what_to_expect": "Not a formal invoice and already paid. NoCap reads it as a restaurant bill, files it under Meals & entertainment, learns Truffles as a new seller without asking for verification, checks the 5% GST and the round-off, and records it as already paid. No PO, no hold.",
         "layout": "receipt",
         "vendor_name": "Truffles Cafe & Kitchen",
-        "header_lines": ["22, 1st Main, Koramangala 5th Block, Bengaluru 560095", "GSTIN 29AABFT6612K1Z8  ·  Ph 080 4110 2233"],
+        "header_lines": ["22, 1st Main, Koramangala 5th Block, Bengaluru 560095", "GSTIN 29AABFT6612K1ZX  ·  Ph 080 4110 2233"],
         "doc_title": "TAX INVOICE / BILL",
         "meta": [("Bill No.", "TCK/2611/0457"), ("Date", "12/11/2026 13:42"), ("Table", "14 (6 covers)")],
         "lines": [

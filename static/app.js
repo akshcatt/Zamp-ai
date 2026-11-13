@@ -338,6 +338,7 @@ async function viewDashboard() {
     <h1>${s.processed ? `${s.processed} invoice${s.processed === 1 ? "" : "s"} handled. <em>${s.touchless_rate}% needed no one.</em>` : `Invoices in, decisions out. <em>Upload one to start.</em>`}</h1>
     <p class="muted" style="margin:0;max-width:640px;font-size:16px">NoCap reads every GST invoice, checks it against your purchase orders, vendors and past payments, then pays it, routes it to the right person, or rejects it, and tells you exactly why. No guesswork, no cap.</p>
     <div class="row">
+      ${s.vendors_to_verify ? `<a class="attn issues-attn" href="#/vendors"><b>${s.vendors_to_verify}</b>new vendor${s.vendors_to_verify === 1 ? "" : "s"} to verify →</a>` : ""}
       ${s.open_issues ? `<button class="attn issues-attn" id="issues-attn"><b>${s.open_issues}</b>issue${s.open_issues === 1 ? "" : "s"} to tick off →</button>` : ""}
       ${pending.length ? `<a class="attn" href="#/queue"><b>${pending.length}</b>${pending.length === 1 ? "invoice is" : "invoices are"} waiting for you${sla.late ? ` · ${sla.late} overdue` : ""} →</a>` : `<span class="attn ok"><b>0</b>Nothing waiting for review</span>`}
       <a class="btn primary" href="#/inbox">${icon.upload} Upload an invoice</a>
@@ -839,9 +840,19 @@ function renderDecision(st) {
 /* ---- reported issues: never blocking, ticked off by a person */
 function issuesHtml(st) {
   const d = st.decision, t = st.run.ticks || {}, done = d.issues.filter((i) => t[i.id]).length;
-  return `<div class="issues" id="issues"><div class="iss-head"><b>Reported issues</b><span class="faint small">${done} of ${d.issues.length} ticked · these don't block payment, they're here for you to look at</span></div>
+  return `<div class="issues" id="issues"><div class="iss-head"><b>Reported issues</b><span class="faint small">${done} of ${d.issues.length} seen · they don't block payment</span>
+      ${done < d.issues.length ? `<button class="btn sm ghost" style="margin-left:auto" onclick="tickAll()">Mark all as seen</button>` : ""}</div>
     ${d.issues.map((i) => `<label class="iss ${t[i.id] ? "done" : ""}"><input type="checkbox" data-issue="${esc(i.id)}" ${t[i.id] ? "checked" : ""}>
       <div><b>${esc(i.label)}</b><div class="small muted">${esc(i.detail)}</div>${t[i.id] ? `<div class="faint small">Ticked by ${esc(t[i.id].actor)} · ${ago(t[i.id].ts)}</div>` : ""}</div></label>`).join("")}</div>`;
+}
+async function tickAll() {
+  const st = window._st, t = st.run.ticks || {};
+  try {
+    for (const i of st.decision.issues.filter((i) => !t[i.id])) {
+      st.run.ticks = (await postJSON(`/api/runs/${st.run.id}/issues/${encodeURIComponent(i.id)}`, { done: true, actor: reviewer() })).ticks;
+    }
+    renderDecision(st); refreshChrome(); toast("All issues marked as seen");
+  } catch (e) { toast(e.message, "error"); }
 }
 document.addEventListener("change", async (e) => {
   const box = e.target.closest("[data-issue]");
@@ -1015,7 +1026,7 @@ function renderReview(st) {
       <p class="muted small" style="margin:0 0 12px">If the vendor is really asking to be paid, type the details from the document. It will be re-checked against every rule, like any invoice.</p>
       <button class="btn" id="fix">${icon.edit} Correct details &amp; re-check</button></div><div id="fix-form"></div>` : "") + (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
       <p class="muted small" style="margin:0 0 10px">${esc(TEAM_WHY[r.route_to] || "")}</p>
-      <textarea id="note" placeholder="Required: what did you check, and why are you approving or rejecting it? This is saved to the history."></textarea>
+      <textarea id="note" placeholder="${["Treasury & Fraud", "Controller approval"].includes(r.route_to) ? "Required for this one: what did you check, and why? It's saved to the history." : "Optional: add a note for the history, or just click Approve / Reject."}"></textarea>
       ${notes.length ? `<div class="quick">${notes.map((n) => `<button type="button" data-n="${esc(n)}">${esc(n.length > 58 ? n.slice(0, 56) + "…" : n)}</button>`).join("")}</div>` : ""}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn ok" id="ap">Approve &amp; record</button><button class="btn bad" id="rj">Reject</button>
         <button class="btn ghost" id="fix">${icon.edit} Correct details &amp; re-check</button>
@@ -1193,6 +1204,7 @@ async function viewRules() {
     ["price_tolerance_pct", "Price wiggle room (%)", "How far an invoice can be off the order before a person looks"],
     ["price_tolerance_abs", "Price wiggle room (₹)", "…and in rupees. Whichever is smaller wins."],
     ["small_difference_max", "Ignore small differences up to (₹)", "Gaps this small are rounding, never a problem: totals, line maths, PO prices and repeat checks"],
+    ["auto_verify_max", "Flag a new supplier's first invoice above (₹)", "Reported for a glance, never held"],
     ["small_difference_pct", "…or up to (% of the amount)", "Whichever of the two is smaller wins. ₹10 vs 2%: a ₹200 line allows ₹4; a ₹50,000 invoice allows ₹10"],
     ["high_value_threshold", "Manager sign-off above (₹)", "Big invoices get a second look even when everything matches"],
     ["inferred_po_min_confidence", "How sure we must be of a guessed PO", "0 to 1. Below this, the buyer confirms which order it is"],
@@ -1220,7 +1232,7 @@ async function viewRules() {
   <div class="grid outcomes" style="margin-top:16px">
     <div class="card pad"><span class="badge APPROVE">Approved</span><p class="muted">Everything checked out, or small differences were within the wiggle room. Recorded and scheduled for payment, taking early-payment discounts when the terms offer one.</p></div>
     <div class="card pad"><span class="badge HOLD">Needs review</span><p class="muted">A person needs to look. It goes to the team that can fix it: <b>fraud check</b> (bank changes), <b>finance manager</b> (large amounts), <b>purchasing</b> (order problems), <b>vendor setup</b> (unknown vendor), or <b>AP</b> (hard to read).</p></div>
-    <div class="card pad"><span class="badge REJECT">Rejected</span><p class="muted">Must not be paid as sent: already billed, vendor blocked, not an invoice, or missing the invoice number or date. Vendors get a ready-to-send email explaining why.</p></div>
+    <div class="card pad"><span class="badge REJECT">Rejected</span><p class="muted">Must not be paid as sent: the same bill was already paid, or the vendor is blocked. Vendors get a ready-to-send email explaining why. Everything else either goes through or comes to a person.</p></div>
   </div>
   <div class="grid quality" style="margin-top:16px">
     <div class="card pad" id="bench"><h2>How accurate is it?</h2><div class="faint small">Loading…</div></div>
@@ -1231,6 +1243,7 @@ async function viewRules() {
   <div class="card pad" style="margin-top:16px"><h2>Your rules</h2><p class="muted" style="margin:-6px 0 18px">Changes apply to the next invoice. Try setting the price wiggle room to 0.5% and re-running the Pragati sample: it flips from approved to needs review.</p>
     <form class="policy-form" id="pf">${fields.map(([k, l, h]) => `<label>${l}<input type="number" step="any" name="${k}" value="${p[k]}"><small>${h}</small></label>`).join("")}
       <label>Approve guessed POs automatically?<select name="inferred_po_auto_approve"><option value="true" ${p.inferred_po_auto_approve ? "selected" : ""}>Yes, if we're sure enough</option><option value="false" ${!p.inferred_po_auto_approve ? "selected" : ""}>No, always ask the buyer</option></select><small>Strict "no PO, no pay" companies pick No</small></label>
+      <label>Verify new suppliers automatically?<select name="auto_verify_new_vendors"><option value="false" ${!p.auto_verify_new_vendors ? "selected" : ""}>No, I verify every new vendor once</option><option value="true" ${p.auto_verify_new_vendors ? "selected" : ""}>Yes, verify them automatically</option></select><span class="faint small">Either way, nothing is looked up outside NoCap</span></label>
     </form><button class="btn primary" style="margin-top:18px" id="save">Save rules</button></div>
   <div class="grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))">
     <div class="card pad"><h2>Principles</h2><ul class="principles muted">
@@ -1261,7 +1274,7 @@ async function viewRules() {
   }).catch(() => {});
   $("#save").onclick = async () => {
     const fd = new FormData($("#pf")), body = {};
-    for (const [k, v] of fd.entries()) body[k] = k === "inferred_po_auto_approve" ? v === "true" : Number(v);
+    for (const [k, v] of fd.entries()) body[k] = ["inferred_po_auto_approve", "auto_verify_new_vendors"].includes(k) ? v === "true" : Number(v);
     await api("/api/policy", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     toast("Saved. Applies to the next invoice.");
   };

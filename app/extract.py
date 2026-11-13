@@ -99,7 +99,7 @@ Rules:
 - invoice_number: the bill's own reference, whatever it's called: invoice no., bill no., receipt no., cash memo no., order ID, booking ID. For utility bills use the bill number (not the consumer/account number). Null if none.
 - vendor_name: the seller, shop, restaurant, utility company or operator.
 - bill_kind, category, already_paid and payment_method are your judgment from the document; set them for every bill.
-- vendor_tax_id is the vendor's GSTIN (15 characters, e.g. 29AAKCS3127M1Z6), not the buyer's.
+- vendor_tax_id is the vendor's GSTIN (15 characters, e.g. 29AAKCS3127M1ZV), not the buyer's.
 - line_items: one entry per printed line. amount is the printed line total.
 - shipping_amount is only for a shipping/freight row in the totals block (next to subtotal and tax). If freight is listed as a line item, it belongs in line_items only. Never count it twice.
 - tax_inclusive = true only if prices are stated to include tax.

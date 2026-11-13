@@ -8,7 +8,7 @@
       "Lumen Home Goods Private Limited"
     ],
     "address": "4th Floor, Prestige Tech Park, Outer Ring Road, Marathahalli, Bengaluru, Karnataka 560103",
-    "gstin": "29AAECL4821K1Z3",
+    "gstin": "29AAECL4821K1Z9",
     "base_currency": "INR"
   },
   "purchase_orders": [
@@ -48,7 +48,7 @@
           "gl_account": "6150 Furniture (expensed)"
         }
       ],
-      "vendor_gstin": "29AAKCS3127M1Z6"
+      "vendor_gstin": "29AAKCS3127M1ZV"
     },
     {
       "po_number": "PO-2026-0287",
@@ -70,7 +70,7 @@
           "gl_account": "6420 Professional Services"
         }
       ],
-      "vendor_gstin": "27AAPFK2210Q1Z9"
+      "vendor_gstin": "27AAPFK2210Q1ZY"
     },
     {
       "po_number": "PO-2026-0342",
@@ -108,7 +108,7 @@
           "gl_account": "5300 Freight Out"
         }
       ],
-      "vendor_gstin": "27AAGCG4419R1Z2"
+      "vendor_gstin": "27AAGCG4419R1Z0"
     },
     {
       "po_number": "PO-2026-0298",
@@ -130,7 +130,7 @@
           "gl_account": "5350 Warehousing"
         }
       ],
-      "vendor_gstin": "27AAGCG4419R1Z2"
+      "vendor_gstin": "27AAGCG4419R1Z0"
     },
     {
       "po_number": "PO-2026-0275",
@@ -168,7 +168,7 @@
           "gl_account": "6600 Repairs & Maintenance"
         }
       ],
-      "vendor_gstin": "33AAHFM3098P1Z4"
+      "vendor_gstin": "33AAHFM3098P1ZP"
     },
     {
       "po_number": "PO-2026-0330",
@@ -198,7 +198,7 @@
           "gl_account": "6300 Facilities"
         }
       ],
-      "vendor_gstin": "29AAJCK5582N1Z8"
+      "vendor_gstin": "29AAJCK5582N1ZN"
     },
     {
       "po_number": "PO-2026-0356",
@@ -228,7 +228,7 @@
           "gl_account": "5200 Packaging"
         }
       ],
-      "vendor_gstin": "29ABBFP3374E1Z1"
+      "vendor_gstin": "29ABBFP3374E1Z7"
     },
     {
       "po_number": "PO-2026-0361",
@@ -250,7 +250,7 @@
           "gl_account": "6700 Events"
         }
       ],
-      "vendor_gstin": "29AQRPA4471H1Z5"
+      "vendor_gstin": "29AQRPA4471H1ZK"
     },
     {
       "po_number": "PO-2026-0368",
@@ -288,7 +288,7 @@
           "gl_account": "6120 Breakroom"
         }
       ],
-      "vendor_gstin": "29AAKCS3127M1Z6"
+      "vendor_gstin": "29AAKCS3127M1ZV"
     }
   ],
   "goods_receipts": [
@@ -408,7 +408,7 @@
         "Kaveri Cloud Solutions",
         "Kaveri Cloud"
       ],
-      "gstin": "27AAPFK2210Q1Z9",
+      "gstin": "27AAPFK2210Q1ZY",
       "email_domain": "kavericloud.in",
       "phone": "+91 20 6712 0178",
       "payment_terms": "Net 30",
@@ -434,7 +434,7 @@
         "Meenakshi Industrial Spares",
         "Meenakshi Spares"
       ],
-      "gstin": "33AAHFM3098P1Z4",
+      "gstin": "33AAHFM3098P1ZP",
       "email_domain": "meenakshispares.com",
       "phone": "+91 44 2625 0190",
       "payment_terms": "Net 30",
@@ -460,7 +460,7 @@
         "Ganga Freight Carriers",
         "Ganga Freight"
       ],
-      "gstin": "27AAGCG4419R1Z2",
+      "gstin": "27AAGCG4419R1Z0",
       "email_domain": "gangafreight.co.in",
       "phone": "+91 22 2851 0122",
       "payment_terms": "Net 45",
@@ -486,7 +486,7 @@
         "Sahyadri Office Supplies",
         "Sahyadri Supplies"
       ],
-      "gstin": "29AAKCS3127M1Z6",
+      "gstin": "29AAKCS3127M1ZV",
       "email_domain": "sahyadrisupplies.in",
       "phone": "+91 80 4123 0141",
       "payment_terms": "2/10 Net 30",
@@ -513,7 +513,7 @@
         "Kesari FS",
         "Kesari Facilities"
       ],
-      "gstin": "29AAJCK5582N1Z8",
+      "gstin": "29AAJCK5582N1ZN",
       "email_domain": "kesarifacility.in",
       "phone": "+91 80 4718 0163",
       "payment_terms": "Net 30",
@@ -540,7 +540,7 @@
         "Pragati Packaging",
         "Pragati Print"
       ],
-      "gstin": "29ABBFP3374E1Z1",
+      "gstin": "29ABBFP3374E1Z7",
       "email_domain": "pragatiprint.in",
       "phone": "+91 80 2837 0137",
       "payment_terms": "Net 30",
@@ -566,7 +566,7 @@
         "Annapurna Catering",
         "Annapurna Events & Caterers"
       ],
-      "gstin": "29AQRPA4471H1Z5",
+      "gstin": "29AQRPA4471H1ZK",
       "email_domain": "annapurnacaterers.in",
       "phone": "+91 98450 10119",
       "payment_terms": "Net 15",

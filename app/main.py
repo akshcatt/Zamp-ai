@@ -356,6 +356,7 @@ def stats():
         **momentum(rs),
         "open_issues": sum(max(0, (r.get("issues") or 0) - (r.get("issues_ticked") or 0)) for r in rs),
         "bills_with_issues": sum(1 for r in rs if (r.get("issues") or 0) > (r.get("issues_ticked") or 0)),
+        "vendors_to_verify": sum(1 for v in db.vendors_all() if v["status"] == "unverified"),
     }
 
 

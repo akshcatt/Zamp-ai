@@ -116,7 +116,8 @@ def test_bulk_review(monkeypatch):
     a = run_sample(c, "edge_bank_change_fraud")
     b = run_sample(c, "edge_split_po_overrun")
     ok = run_sample(c, "happy_path")
-    assert c.post("/api/runs/bulk-action", json={"run_ids": [a["id"], b["id"]], "action": "reject", "note": ""}).json()["failed"] == 2
+    # approving a fraud hold needs a reason; routine reviews don't
+    assert c.post("/api/runs/bulk-action", json={"run_ids": [a["id"]], "action": "approve", "note": ""}).json()["failed"] == 1
     res = c.post("/api/runs/bulk-action", json={"run_ids": [a["id"], b["id"], ok["id"]], "action": "reject",
                                                 "note": "Checked with buyer", "actor": "Sam"}).json()
     assert res["done"] == 2 and res["failed"] == 1  # the approved one can't be "reviewed"
@@ -255,10 +256,29 @@ def test_autoload_replays_samples_from_stored_reads(monkeypatch):
 
 
 
+def test_new_supplier_with_valid_details_is_verified_automatically(monkeypatch):
+    """Optional setting (off by default): verify new suppliers automatically."""
+    c, db, pl = make_client(monkeypatch)
+    db.set_policy({"auto_verify_new_vendors": True})
+    db.q("DELETE FROM vendors WHERE legal_name LIKE 'Sahyadri%'")
+    r = run_sample(c, "happy_path")
+    assert r["decision"] == "APPROVE", r["headline"]
+    v = next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Sahyadri"))
+    assert v["status"] == "active" and v["source"] == "first invoice (auto-verified)"
+
+
+def test_gstin_checksum():
+    from app.pipeline import gstin_valid
+    assert gstin_valid("27AAPFU0939F1ZV")          # a real, published GSTIN
+    assert not gstin_valid("27AAPFU0939F1ZA")      # one character off
+    assert not gstin_valid("29AAKCS3127M1Z")       # too short
+
+
 def test_new_vendor_is_learned_then_verified_once(monkeypatch):
-    """No vendor master: an unknown vendor is added from its first invoice, held once, and re-checked after verification."""
+    """When a new supplier can't be verified automatically, it's held once and re-checked after a person verifies."""
     c, db, pl = make_client(monkeypatch)
     db.q("DELETE FROM vendors WHERE legal_name LIKE 'Sahyadri%'")  # we have never dealt with them
+    assert db.get_policy()["auto_verify_new_vendors"] is False  # the default: a person verifies every new vendor once
     r = run_sample(c, "happy_path")
     assert r["decision"] == "HOLD" and r["route_to"] == "Vendor Management" and "new vendor" in r["headline"]
     new = next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Sahyadri"))
@@ -297,3 +317,14 @@ def test_tick_off_reported_issues(monkeypatch):
     assert c.get("/api/stats").json()["open_issues"] == len(issues) - 1
     assert c.post(f"/api/runs/{r['id']}/issues/not.a.check", json={"done": True}).status_code == 400
     assert c.get(f"/api/runs/{r['id']}").json()["ticks"]
+
+
+
+def test_everyday_seller_is_added_unverified_but_the_bill_goes_through(monkeypatch):
+    c, db, pl = make_client(monkeypatch)
+    r = run_sample(c, "bill_restaurant")
+    assert r["decision"] == "APPROVE"
+    v = next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Truffles"))
+    assert v["status"] == "unverified" and c.get("/api/stats").json()["vendors_to_verify"] == 1
+    c.post(f"/api/vendors/{v['vendor_id']}/verify", json={"actor": "Priya"})
+    assert c.get("/api/stats").json()["vendors_to_verify"] == 0

@@ -240,7 +240,9 @@ def human_action(run_id: str, action: str, actor: str, note: str) -> dict:
     if run["decision"] != "HOLD" or run.get("review_status") not in (None, "pending"):
         raise ValueError("only pending held invoices can be actioned")
     if not note.strip():
-        raise ValueError("a note is required. It goes into the audit trail.")
+        if action == "approve" and run.get("route_to") in ("Treasury & Fraud", "Controller approval"):
+            raise ValueError("Add a short reason: approving a fraud or high-value hold is recorded in the audit trail.")
+        note = {"approve": "Approved after review", "reject": "Rejected after review"}.get(action, "Reviewed")
     if action == "approve":
         tr = run["trace"]
         inv = tr.get("stages", {}).get("extract", {}).get("data", {}).get("fields")
@@ -299,8 +301,31 @@ CATEGORY_GL = {"office_supplies": "6100 Office Supplies", "pantry_and_housekeepi
                "packaging_and_raw_materials": "5200 Packaging & Materials", "events": "6700 Events", "repairs_and_spares": "6600 Repairs & Maintenance",
                "medical": "6740 Medical", "other": "6999 Other Expenses"}
 # Lenient by design: only real money risks stop a bill. Everything else is REPORTED as an issue a person can tick off.
-SOFT_CHECKS = {"val.required", "val.vendor_name", "val.confidence", "val.grounding", "val.billto", "val.date", "val.due", "val.tax", "val.currency",
+SOFT_CHECKS = {"ven.newcheck", "val.required", "val.vendor_name", "val.confidence", "val.grounding", "val.billto", "val.date", "val.due", "val.tax", "val.currency",
                "ven.taxid", "dup.fuzzy", "po.identify", "po.status", "po.currency", "extract.warning", "analyze.pages"}
+
+
+_GST_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+GST_STATES = {f"{i:02d}" for i in range(1, 39)} | {"97", "99"}
+
+
+def gstin_valid(g: str | None) -> bool:
+    """Format + state code + the official GSTIN check character (mod-36 checksum)."""
+    g = (g or "").replace(" ", "").upper()
+    if not re.fullmatch(r"\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]", g) or g[:2] not in GST_STATES:
+        return False
+    total = 0
+    for i, ch in enumerate(g[:14]):
+        v = _GST_CHARS.index(ch) * (1 if i % 2 == 0 else 2)
+        total += v // 36 + v % 36
+    return _GST_CHARS[(36 - total % 36) % 36] == g[14]
+
+
+def ifsc_valid(code: str | None) -> bool:
+    return bool(re.fullmatch(r"[A-Z]{4}0[A-Z0-9]{6}", (code or "").replace(" ", "").upper()))
+
+
+QUIET_FOR_EVERYDAY = {"val.required", "val.billto", "val.tax", "val.grounding", "val.confidence", "dup.fuzzy", "ven.taxid"}
 
 
 def category_name(c: str | None) -> str:
@@ -698,12 +723,15 @@ def st_vendor(ctx):
                               "hold", "ap", evidence={"candidates": cands}))
             ctx["halt_po"] = True
             return {"summary": "Vendor could not be identified.", "checks": checks, "data": {"candidates": cands}}
-        if ctx.get("informal"):  # an everyday seller, or nothing left to pay: learn them, nothing to verify
-            best = db.vendor_add_from_invoice(inv, ctx["run_id"], status="active", source="first bill")
+        if ctx.get("informal"):  # an everyday seller, or nothing left to pay: learn them; the bill isn't held
+            auto = ctx["policy"].get("auto_verify_new_vendors", False)
+            best = db.vendor_add_from_invoice(inv, ctx["run_id"], status="active" if auto else "unverified",
+                                              source="first bill (auto-verified)" if auto else "first bill")
             ctx["vendor"] = best
             checks.append(chk("ven.match", "Vendor on file", "info",
                               f"New seller {best['legal_name']} ({best['vendor_id']}) added to the vendor list from this {BILL_KIND_NAMES[inv['bill_kind']]}. "
-                              + ("Already paid, so there's nothing to verify." if inv["already_paid"] else "Everyday bill, so no verification is needed.")))
+                              + ("" if auto else "Verify them once on the Vendors page. ")
+                              + ("The bill isn't held: it was already paid." if inv["already_paid"] else "The bill isn't held: it's an everyday bill.")))
             ctx["fraud_signals"] = []
             note = inv.get("payment_instruction_notes") or ""
             if re.search(r"(new|changed?|update[ds]?)\s+(bank|account|banking|remit)|changed banks", note, re.I):
@@ -712,6 +740,39 @@ def st_vendor(ctx):
             return {"summary": f"New seller added: {best['legal_name']} ({best['vendor_id']}).", "checks": checks,
                     "data": {"vendor": {k: best[k] for k in ("vendor_id", "legal_name", "status", "payment_terms", "phone_on_file", "email_domain")},
                              "new_vendor": True, "candidates": cands, "fraud_signals": ctx["fraud_signals"]}}
+        P = ctx["policy"]
+        b0 = inv.get("bank_details") or {}
+        note0 = inv.get("payment_instruction_notes") or ""
+        concerns = []  # things a person may want to glance at; never a reason to hold
+        if not gstin:
+            concerns.append("no GSTIN printed")
+        elif not gstin_valid(gstin):
+            concerns.append(f"GSTIN {gstin} fails the official format/checksum test")
+        if b0.get("account_number") and not ifsc_valid(b0.get("ifsc")):
+            concerns.append(f"IFSC '{b0.get('ifsc') or '—'}' isn't a valid IFSC")
+        if (inv.get("total_amount") or 0) > P.get("auto_verify_max", 500000.0):
+            concerns.append(f"a large first invoice ({money(inv.get('total_amount'))})")
+        changes_bank = bool(re.search(r"(new|changed?|update[ds]?)\s+(bank|account|banking|remit)|changed banks", note0, re.I))
+        if P.get("auto_verify_new_vendors", True):
+            # Sample/demo default: every new supplier is verified automatically. Concerns are reported, not held.
+            best = db.vendor_add_from_invoice(inv, ctx["run_id"], status="active", source="first invoice (auto-verified)")
+            ctx["vendor"] = best
+            checks.append(chk("ven.match", "Vendor on file", "info",
+                              f"New supplier {best['legal_name']} ({best['vendor_id']}) added and verified automatically"
+                              + (f": GSTIN {gstin} passes the official checksum" if gstin and gstin_valid(gstin) else "")
+                              + ". Their details are now the reference for every later invoice."))
+            if concerns:
+                checks.append(chk("ven.newcheck", "New supplier details", "fail",
+                                  "Verified automatically, but worth a glance: " + "; ".join(concerns) + ".", "hold", "vendor_mgmt"))
+            ctx["fraud_signals"] = []
+            if changes_bank:  # fraud protection, not verification: still stops the bill
+                ctx["fraud_signals"].append("invoice announces a change of bank details")
+                checks.append(chk("ven.change_notice", "Change-of-bank language", "fail",
+                                  f"Invoice text: “{note0[:160]}”. A brand-new supplier asking to change banks is a red flag.", "hold", "fraud"))
+            return {"summary": f"New supplier auto-verified: {best['legal_name']} ({best['vendor_id']}).", "checks": checks,
+                    "data": {"vendor": {k: best[k] for k in ("vendor_id", "legal_name", "status", "payment_terms", "phone_on_file", "email_domain")},
+                             "new_vendor": True, "auto_verified": True, "candidates": cands, "fraud_signals": ctx["fraud_signals"]}}
+        ctx["verify_why"] = concerns
         best = db.vendor_add_from_invoice(inv, ctx["run_id"])
         ctx["vendor"], ctx["new_vendor"] = best, True
         b = best["bank"]
@@ -719,7 +780,9 @@ def st_vendor(ctx):
                           f"New vendor: {best['legal_name']} ({best['vendor_id']}) was added to the vendor list from this invoice"
                           + (f", GSTIN {best['tax_id']}" if best["tax_id"] else ", no GSTIN printed")
                           + (f", paid to {b['bank_name'] or 'a bank'} IFSC {b['ifsc'] or '—'} a/c ••••{b['account_number'][-4:]}" if b["account_number"] else "")
-                          + ". Verify the vendor once before anything is paid; their details then become the reference for every later invoice.",
+                          + ". Verify the vendor once; their details then become the reference for every later invoice."
+                          + (f" Worth checking first: {'; '.join(ctx['verify_why'])}." if ctx.get("verify_why") else
+                             (f" Offline check: GSTIN {gstin} passes the official checksum." if gstin and gstin_valid(gstin) else "")),
                           "hold", "vendor_mgmt", evidence={"candidates": cands, "vendor": best}))
         ctx["fraud_signals"] = []
         note = inv.get("payment_instruction_notes") or ""
@@ -738,6 +801,9 @@ def st_vendor(ctx):
     if best["status"] == "blocked":
         checks.append(chk("ven.status", "Vendor is active", "fail",
                           f"Vendor is blocked for payment: {best.get('status_reason') or 'no reason recorded'}", "reject"))
+    elif best["status"] == "unverified" and ctx.get("informal"):
+        checks.append(chk("ven.status", "Vendor is verified", "info",
+                          f"{best['legal_name']} isn't verified yet. Everyday bills from them aren't held; verify them once on the Vendors page."))
     elif best["status"] == "unverified":
         checks.append(chk("ven.status", "Vendor is verified", "fail",
                           f"{best['legal_name']} was added on {(best.get('created_at') or '')[:10]} from their first invoice and hasn't been verified yet.",
@@ -1084,6 +1150,9 @@ def st_decision(ctx):
     for k, s in trace["stages"].items():
         for c in s.get("checks", []):
             if c.get("outcome") in ("hold", "reject") and c["id"] in SOFT_CHECKS:
+                if ctx.get("informal") and c["id"] in QUIET_FOR_EVERYDAY:
+                    c.update(outcome=None, status="info")  # normal for a receipt / cash memo: a note, nothing to tick
+                    continue
                 c.update(outcome=None, status="warn", reported=True)
             if c.get("reported") or (c["status"] == "warn" and c["id"] in SOFT_CHECKS):
                 c["reported"] = True

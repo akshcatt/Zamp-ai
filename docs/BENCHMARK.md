@@ -3,14 +3,14 @@
 Run on 2026-11-13 with `gemini-3.1-flash-lite` (free tier) over the 12 sample documents, each through the full pipeline.
 Ground truth is the exact data each document was rendered from; it is read only after the decision is made.
 
-- **Fields read correctly:** 165/166 (99.4%)
+- **Fields read correctly:** 166/166 (100.0%)
 - **Decisions and routing correct:** 12/12 (100.0%)
-- **Median AI read time:** 3.1 s
+- **Median AI read time:** 3.4 s
 
 | Field | Correct |
 | --- | --- |
 | Document type | 12/12 |
-| Bill type | 10/11 |
+| Bill type | 11/11 |
 | Already paid? | 11/11 |
 | Vendor name | 11/11 |
 | Invoice number | 11/11 |
@@ -38,7 +38,7 @@ Ground truth is the exact data each document was rendered from; it is read only 
 | 09_variant_quote_pragati_Q-2291.pdf | 1/1 | NOT_INVOICE | NOT_INVOICE | — |
 | 10_bill_restaurant_truffles_TCK-0457.pdf | 15/15 | APPROVE | APPROVE | — |
 | 11_bill_electricity_bescom_Nov-2026.pdf | 15/15 | APPROVE | APPROVE | — |
-| 12_bill_handwritten_cash_memo_lakshmi_412.jpg | 14/15 | APPROVE | APPROVE | Bill type |
+| 12_bill_handwritten_cash_memo_lakshmi_412.jpg | 15/15 | APPROVE | APPROVE | — |
 
 Caveat: a dozen synthetic documents is a smoke-level benchmark, not a statistical claim. Real vendor invoices are messier;
 the next step is a labelled set of real (redacted) invoices from the customer.

@@ -2,12 +2,12 @@
   "run_on": "2026-11-13",
   "model": "gemini-3.1-flash-lite",
   "samples": 12,
-  "field_accuracy": 99.4,
-  "fields_correct": 165,
+  "field_accuracy": 100.0,
+  "fields_correct": 166,
   "fields_total": 166,
   "decision_accuracy": 100.0,
   "decisions_correct": 12,
-  "median_read_seconds": 3.1,
+  "median_read_seconds": 3.4,
   "by_field": [
     {
       "field": "Document type",
@@ -16,7 +16,7 @@
     },
     {
       "field": "Bill type",
-      "correct": 10,
+      "correct": 11,
       "total": 11
     },
     {
@@ -98,8 +98,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2786,
-      "seconds": 3.5
+      "read_ms": 4082,
+      "seconds": 4.7
     },
     {
       "sample": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
@@ -113,7 +113,7 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3270,
+      "read_ms": 3237,
       "seconds": 3.5
     },
     {
@@ -128,8 +128,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3116,
-      "seconds": 3.3
+      "read_ms": 4600,
+      "seconds": 4.7
     },
     {
       "sample": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
@@ -143,8 +143,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2597,
-      "seconds": 2.9
+      "read_ms": 3208,
+      "seconds": 3.3
     },
     {
       "sample": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
@@ -157,9 +157,9 @@
       "fields": 15,
       "misses": [],
       "extractor": "gemini",
-      "model": "gemini-3.5-flash-lite",
-      "read_ms": 33985,
-      "seconds": 34.1
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 8830,
+      "seconds": 9.0
     },
     {
       "sample": "06_variant_tolerance_pragati_PPP-7734.pdf",
@@ -173,8 +173,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 4221,
-      "seconds": 4.3
+      "read_ms": 13052,
+      "seconds": 13.3
     },
     {
       "sample": "07_variant_missing_fields_annapurna.pdf",
@@ -188,8 +188,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2328,
-      "seconds": 2.5
+      "read_ms": 25129,
+      "seconds": 25.4
     },
     {
       "sample": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
@@ -203,7 +203,7 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3499,
+      "read_ms": 3536,
       "seconds": 3.7
     },
     {
@@ -218,8 +218,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2580,
-      "seconds": 2.7
+      "read_ms": 2801,
+      "seconds": 2.9
     },
     {
       "sample": "10_bill_restaurant_truffles_TCK-0457.pdf",
@@ -233,8 +233,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3144,
-      "seconds": 3.3
+      "read_ms": 2912,
+      "seconds": 3.1
     },
     {
       "sample": "11_bill_electricity_bescom_Nov-2026.pdf",
@@ -248,8 +248,8 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 2499,
-      "seconds": 2.7
+      "read_ms": 3165,
+      "seconds": 3.3
     },
     {
       "sample": "12_bill_handwritten_cash_memo_lakshmi_412.jpg",
@@ -258,15 +258,13 @@
       "route": "Recorded: already paid",
       "expected": "APPROVE",
       "decision_ok": true,
-      "fields_ok": 14,
+      "fields_ok": 15,
       "fields": 15,
-      "misses": [
-        "Bill type"
-      ],
+      "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 3291,
-      "seconds": 3.5
+      "read_ms": 3055,
+      "seconds": 3.3
     }
   ]
 }

@@ -1,7 +1,7 @@
 [
  {
   "file": "01_happy_sahyadri_SOS-58213.pdf",
-  "sha256": "77635b80f5959e633e55494eb2d4bc8b458a7fdaa8d8b2d3280e6f8ab0e34ee4",
+  "sha256": "1e8b397d54070cdb5d2d75e3eac7e2cfa128855755ca425f8d745e6ed95480ba",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -11,7 +11,7 @@
    "payment_method": null,
    "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
    "vendor_address": "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058",
-   "vendor_tax_id": "29AAKCS3127M1Z6",
+   "vendor_tax_id": "29AAKCS3127M1ZV",
    "vendor_email": "accounts@sahyadrisupplies.in",
    "vendor_phone": null,
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -71,7 +71,7 @@
  },
  {
   "file": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
-  "sha256": "c4efb48692929ea757cb19e5666265b409b54e809cfe4d32ae2ffc38f925151e",
+  "sha256": "602f06df1850c99e7a33d3112cb9442c09f0203715cb2e57f08dd2dad845e1ad",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -81,7 +81,7 @@
    "payment_method": null,
    "vendor_name": "Kaveri Cloud Solutions LLP",
    "vendor_address": "Office 902, Panchshil Tech Park, Yerwada, Pune, Maharashtra 411006",
-   "vendor_tax_id": "27AAPFK2210Q1Z9",
+   "vendor_tax_id": "27AAPFK2210Q1ZY",
    "vendor_email": "billing@kavericloud.in",
    "vendor_phone": null,
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -102,7 +102,7 @@
    "subtotal": 1740000.0,
    "discount_amount": null,
    "tax_amount": 313200.0,
-   "tax_rate_pct": 18,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
    "round_off": null,
    "total_amount": 2053200.0,
@@ -114,7 +114,7 @@
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": null,
+   "payment_instruction_notes": "Bank: ICICI Bank Ltd. A/c No. 182905009188 IFSC ICIC0001829",
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -129,7 +129,7 @@
  },
  {
   "file": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
-  "sha256": "5938b178b7a9bc28fd5d91460c4a5e183f3641d74acfe325153a1b517954e433",
+  "sha256": "1e8ca6bdf60c274d0b2ef3a1c324f389adde1763d1a6aaca72313124e5bdd257",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -139,7 +139,7 @@
    "payment_method": null,
    "vendor_name": "GANGA FREIGHT CARRIERS PVT. LTD.",
    "vendor_address": "Gala 7, Rahnal Village, Bhiwandi, Thane, Maharashtra 421302",
-   "vendor_tax_id": "27AAGCG4419R1Z2",
+   "vendor_tax_id": "27AAGCG4419R1Z0",
    "vendor_email": "billing@gangafreight.co.in",
    "vendor_phone": "+91 22 2851 0122",
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -199,7 +199,7 @@
  },
  {
   "file": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
-  "sha256": "20090c0375b7aa0aa91c8d990fd94be333200a5d76c58e489283132984b9a562",
+  "sha256": "71bea14e08ee6d02788a20848e816c4ed28a8922dd9af8f9f255529589a9eaca",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -209,7 +209,7 @@
    "payment_method": null,
    "vendor_name": "MEENAKSHI INDUSTRIAL SPARES CO.",
    "vendor_address": "112, SIDCO Industrial Estate, Ambattur, Chennai, Tamil Nadu 600098",
-   "vendor_tax_id": "33AAHFM3098P1Z4",
+   "vendor_tax_id": "33AAHFM3098P1ZP",
    "vendor_email": "ar@meenakshispares.com",
    "vendor_phone": "+91 44 2625 0190",
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -265,13 +265,13 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "Stamp saying SECOND NOTICE present on page"
+    "Document contains a 'SECOND NOTICE' stamp."
    ]
   }
  },
  {
   "file": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
-  "sha256": "1b894420acdef36e6549b83a7c917bd1638475b12c1785e513b4bf25aa371ffc",
+  "sha256": "9df7032696ceeeb522d18c7be2792be53d74461eaf91d076345af29f0f35a4b6",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -281,7 +281,7 @@
    "payment_method": null,
    "vendor_name": "Kesari Facility Services Pvt. Ltd.",
    "vendor_address": "No. 221, 5th Main, HSR Layout Sector 7, Bengaluru, Karnataka 560102",
-   "vendor_tax_id": "29AAJCK5582N1Z8",
+   "vendor_tax_id": "29AAJCK5582N1ZN",
    "vendor_email": "accounts@kesari-facility-billing.com",
    "vendor_phone": "+91 80 4718 0163",
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -308,7 +308,7 @@
    "subtotal": 724000.0,
    "discount_amount": null,
    "tax_amount": 130320.0,
-   "tax_rate_pct": 18.0,
+   "tax_rate_pct": 18,
    "shipping_amount": null,
    "round_off": null,
    "total_amount": 854320.0,
@@ -335,7 +335,7 @@
  },
  {
   "file": "06_variant_tolerance_pragati_PPP-7734.pdf",
-  "sha256": "584e1e9d84421da96be10e7194663ba54320326177605f19d8426b789c356f7f",
+  "sha256": "837df563e6282875984532c37d035cc7fce5e4e2dc807d390769806810714cd5",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -345,7 +345,7 @@
    "payment_method": null,
    "vendor_name": "Pragati Print & Packaging",
    "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
-   "vendor_tax_id": "29ABBFP3374E1Z1",
+   "vendor_tax_id": "29ABBFP3374E1Z7",
    "vendor_email": "invoices@pragatiprint.in",
    "vendor_phone": null,
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -378,7 +378,7 @@
    "subtotal": 467600.0,
    "discount_amount": null,
    "tax_amount": 84168.0,
-   "tax_rate_pct": 18.0,
+   "tax_rate_pct": 18,
    "shipping_amount": null,
    "round_off": null,
    "total_amount": 551768.0,
@@ -392,20 +392,20 @@
    },
    "payment_instruction_notes": null,
    "field_confidence": {
-    "vendor_name": 1.0,
-    "invoice_number": 1.0,
-    "invoice_date": 1.0,
-    "po_reference": 1.0,
-    "total_amount": 1.0,
-    "line_items": 1.0,
-    "bank_details": 1.0
+    "vendor_name": 1,
+    "invoice_number": 1,
+    "invoice_date": 1,
+    "po_reference": 1,
+    "total_amount": 1,
+    "line_items": 1,
+    "bank_details": 1
    },
    "extraction_warnings": []
   }
  },
  {
   "file": "07_variant_missing_fields_annapurna.pdf",
-  "sha256": "10e21621547668341f663b85d1bd8dbdd0a9262a7c5ad62d3676c83ba92f1814",
+  "sha256": "a7e0600474036e4282d68788a8074ca802aa7474146861a09a55b27235d88997",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -415,7 +415,7 @@
    "payment_method": null,
    "vendor_name": "Annapurna Caterers",
    "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038",
-   "vendor_tax_id": "29AQRPA4471H1Z5",
+   "vendor_tax_id": "29AQRPA4471H1ZK",
    "vendor_email": "hello@annapurnacaterers.in",
    "vendor_phone": null,
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -458,22 +458,24 @@
     "line_items": 1.0,
     "bank_details": 1.0
    },
-   "extraction_warnings": []
+   "extraction_warnings": [
+    "Invoice number is not explicitly printed on the document."
+   ]
   }
  },
  {
   "file": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
-  "sha256": "f97b791ec3ed21afe4fd25493034b8bad4fa6f46cf2ebfa79eb1fa255a8cbf01",
+  "sha256": "c9d8361a3357d4e32f0b4ffc5d5eb4a8b3dc0418fa6be68d265f97d035e2aa6d",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
    "bill_kind": "tax_invoice",
-   "category": "office_supplies",
+   "category": "pantry_and_housekeeping",
    "already_paid": false,
    "payment_method": null,
    "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
    "vendor_address": "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058",
-   "vendor_tax_id": "29AAKCS3127M1Z6",
+   "vendor_tax_id": "29AAKCS3127M1ZV",
    "vendor_email": "accounts@sahyadrisupplies.in",
    "vendor_phone": null,
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -533,7 +535,7 @@
  },
  {
   "file": "09_variant_quote_pragati_Q-2291.pdf",
-  "sha256": "e77da4171e84c8620f8c108c9a5f6de30555e96fb93961cb397520d3c5067c4f",
+  "sha256": "7ba8354a3a200de70ccf344ff6257969457bfc94ab2bd4dbda00587c72129ad0",
   "extractor": "gemini",
   "data": {
    "document_type": "quote",
@@ -541,9 +543,9 @@
    "category": "packaging_and_raw_materials",
    "already_paid": false,
    "payment_method": null,
-   "vendor_name": "Pragati Print & Packaging",
+   "vendor_name": "PRAGATI PRINT & PACKAGING",
    "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
-   "vendor_tax_id": "29ABBFP3374E1Z1",
+   "vendor_tax_id": "29ABBFP3374E1Z7",
    "vendor_email": "sales@pragatiprint.in",
    "vendor_phone": "+91 80 2837 0148",
    "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
@@ -582,7 +584,7 @@
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "This is a quotation, not a request for payment. Prices are valid for 30 days. To accept, please issue a purchase order referencing Q-2291.",
+   "payment_instruction_notes": "To accept, please issue a purchase order referencing Q-2291.",
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -593,13 +595,13 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "This document is a quotation, not an invoice or bill."
+    "This document is a quotation, not an invoice."
    ]
   }
  },
  {
   "file": "10_bill_restaurant_truffles_TCK-0457.pdf",
-  "sha256": "2f59772a9e73775dcd0e82daceff1937dbf4e7f09711152606dff8b7c27ab069",
+  "sha256": "2c14f35c49bda1cc63443cd7df37db4fa5510c4ee6950f7f2dc1f116c782f982",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -609,7 +611,7 @@
    "payment_method": "card",
    "vendor_name": "Truffles Cafe & Kitchen",
    "vendor_address": "22, 1st Main, Koramangala 5th Block, Bengaluru 560095",
-   "vendor_tax_id": "29AABFT6612K1Z8",
+   "vendor_tax_id": "29AABFT6612K1ZX",
    "vendor_email": null,
    "vendor_phone": "080 4110 2233",
    "bill_to_name": null,
@@ -675,7 +677,7 @@
  },
  {
   "file": "11_bill_electricity_bescom_Nov-2026.pdf",
-  "sha256": "8a32ad78dd90d3028f83f725930ae08d2bc6ea613f0359659468bc092f8e36cc",
+  "sha256": "8cc5dfb98f61caf8d6e7e185557ffbe3b709c03a61835bc7cfecc6a6e77e1d75",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
@@ -736,7 +738,7 @@
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Pay online at bescom.co.in or any BBPS app before the due date to avoid disconnection.",
+   "payment_instruction_notes": "Pay online at bescom.co.in or any BBPS app before the due date to avoid disconnection. A delayed payment surcharge applies after the due date.",
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -755,7 +757,7 @@
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
-   "bill_kind": "retail_receipt",
+   "bill_kind": "handwritten_bill",
    "category": "pantry_and_housekeeping",
    "already_paid": true,
    "payment_method": "cash",
@@ -804,7 +806,7 @@
    "shipping_amount": null,
    "round_off": null,
    "total_amount": 2180.0,
-   "tax_inclusive": true,
+   "tax_inclusive": false,
    "bank_details": {
     "bank_name": null,
     "ifsc": null,

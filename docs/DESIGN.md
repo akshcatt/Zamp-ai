@@ -72,7 +72,7 @@ Three extra inputs show the "close but not exact", "communicate back" and "it is
 
 ## 5. Assumptions (stated, so they can be challenged)
 
-- **Buyer:** Lumen Home Goods Pvt. Ltd., a fictional Bengaluru retailer (GSTIN 29AAECL4821K1Z3). INR only. GST: CGST + SGST from Karnataka vendors, IGST from other states, reverse charge (RCM) on freight. Remit-to banks are checked by IFSC + account number.
+- **Buyer:** Lumen Home Goods Pvt. Ltd., a fictional Bengaluru retailer (GSTIN 29AAECL4821K1Z9). INR only. GST: CGST + SGST from Karnataka vendors, IGST from other states, reverse charge (RCM) on freight. Remit-to banks are checked by IFSC + account number.
 - **POs are net of tax.** Matching compares the invoice net (subtotal + shipping, or total − tax when prices include tax) against PO line values.
 - **Tolerance:** 2% **and** ₹40,000, whichever is tighter. This applies per invoice (price/qty variance) and to cumulative billing against the PO.
 - **Goods POs need a receipt (3-way); service POs don't (2-way).**
@@ -120,3 +120,7 @@ There is no vendor master to load or maintain. Vendors are learned:
 NoCap accepts every kind of bill: GST tax invoices, utility bills, restaurant and shop receipts, travel receipts, online orders and handwritten cash memos. The reader also returns `bill_kind`, `category` and `already_paid`. Everyday bills (anything that isn't a formal tax invoice, or anything already paid) need no purchase order and no vendor verification; they're booked to the category's ledger account, and already-paid bills are recorded rather than scheduled.
 
 Only money risks block a bill (duplicates, bank-change and look-alike-domain fraud, blocked vendors, no readable amount, amounts beyond the rounding limit, PO price or cumulative overruns, goods not received, high-value sign-off, and the one-time check of a new bank-paid supplier). Every other finding is a **reported issue**: shown on the bill with a tick box, counted on the Overview, never a hold.
+
+## Minimal human effort
+
+People are asked only at the points that matter: possible fraud, very large amounts, money that doesn't add up, PO overruns, goods not received, and new suppliers whose details don't verify. Every new vendor is verified once by a person (one click); bank-paid suppliers' first invoice waits for it, everyday sellers' bills don't. Nothing is checked against outside services: the GSTIN's mod-36 check character is computed offline and shown as a hint. Automatic verification exists as a setting (`auto_verify_new_vendors`, off by default). Review notes are optional except when overriding fraud or controller holds.

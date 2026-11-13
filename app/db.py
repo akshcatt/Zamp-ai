@@ -33,6 +33,8 @@ DEFAULT_POLICY = {
     "small_difference_pct": 2.0,         # ... this % of the amount are rounding, never a problem (totals, lines, PO, repeats)
     "high_value_threshold": 2500000.0,   # Rs. 25 lakh: above this a controller signs off, even if matched
     "inferred_po_auto_approve": True,    # may an inferred (not quoted) PO be auto-approved?
+    "auto_verify_new_vendors": False,    # off: a person verifies every new vendor once (no outside lookups either way)
+    "auto_verify_max": 500000.0,         # Rs.: a first invoice above this is reported as worth a glance
     "inferred_po_min_confidence": 0.85,
     "min_field_confidence": 0.70,        # below this on a critical field -> human review
     "fuzzy_duplicate_window_days": 45,   # same vendor + same amount within N days -> review
