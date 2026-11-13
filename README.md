@@ -35,7 +35,7 @@ The repo includes a `Dockerfile` and a `render.yaml`:
 - **Render:** New → Blueprint → point it at this repo → set `GEMINI_API_KEY`.
 - **Railway / Fly / Hugging Face Spaces (Docker):** same image. It listens on `$PORT`.
 
-Storage is SQLite inside the container. On free tiers it resets on redeploy. That's fine for a demo, and "Reset demo data" on the dashboard does the same thing on purpose.
+Storage is SQLite inside the container. On free tiers it resets on redeploy. That's fine for a demo, and "Reset demo data" on the Overview page does the same thing on purpose.
 
 ## What's in the box
 
@@ -46,7 +46,7 @@ Storage is SQLite inside the container. On free tiers it resets on redeploy. Tha
 | `app/db.py` | SQLite: runs, invoice ledger, audit trail, editable policy, extraction cache |
 | `app/seed/master_data.json` | The "ERP": 8 vendors (one blocked), 8 POs, goods receipts, invoice history |
 | `app/main.py` | FastAPI: REST, plus Server-Sent Events for the live run view |
-| `static/` | The UI: dashboard, inbox, live run view, review queue, POs & ledger, rules & process |
+| `static/` | The UI: overview, upload, live invoice view (with side-by-side document check), needs-review list with deadlines, records, how it works. Light/dark theme, ⌘K search, CSV export |
 | `samples/` | 8 test invoices in 3 vendor layouts, including an image-only scan and a phone photo (JPEG) |
 | `scripts/generate_samples.py` | Regenerates the test invoices |
 | `docs/DESIGN.md` | Process map, assumptions, rules, edge-case rationale, trade-offs, what's next |
