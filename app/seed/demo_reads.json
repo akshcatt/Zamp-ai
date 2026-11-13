@@ -1,10 +1,14 @@
 [
  {
   "file": "01_happy_sahyadri_SOS-58213.pdf",
-  "sha256": "602698784bddd078864cdb3c0cf246752e0b53c2fcb1ae6715bbed5b213514c0",
+  "sha256": "77635b80f5959e633e55494eb2d4bc8b458a7fdaa8d8b2d3280e6f8ab0e34ee4",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "office_supplies",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
    "vendor_address": "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058",
    "vendor_tax_id": "29AAKCS3127M1Z6",
@@ -67,10 +71,14 @@
  },
  {
   "file": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
-  "sha256": "813973bbacdd5c3be8e0a0d0475a2f4a6b9a220e66cb7e293d91dec9c971ecc1",
+  "sha256": "c4efb48692929ea757cb19e5666265b409b54e809cfe4d32ae2ffc38f925151e",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "professional_services",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "Kaveri Cloud Solutions LLP",
    "vendor_address": "Office 902, Panchshil Tech Park, Yerwada, Pune, Maharashtra 411006",
    "vendor_tax_id": "27AAPFK2210Q1Z9",
@@ -94,7 +102,7 @@
    "subtotal": 1740000.0,
    "discount_amount": null,
    "tax_amount": 313200.0,
-   "tax_rate_pct": 18.0,
+   "tax_rate_pct": 18,
    "shipping_amount": null,
    "round_off": null,
    "total_amount": 2053200.0,
@@ -121,10 +129,14 @@
  },
  {
   "file": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
-  "sha256": "e7aa080fad2ddfbaef6396e2f5197ea940bc8e3c19b785de66aed4d4abdc250d",
+  "sha256": "5938b178b7a9bc28fd5d91460c4a5e183f3641d74acfe325153a1b517954e433",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "logistics_and_courier",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "GANGA FREIGHT CARRIERS PVT. LTD.",
    "vendor_address": "Gala 7, Rahnal Village, Bhiwandi, Thane, Maharashtra 421302",
    "vendor_tax_id": "27AAGCG4419R1Z2",
@@ -172,7 +184,7 @@
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": "Bank: Axis Bank Ltd. A/c No. 912020044601460 IFSC UTIB0000412",
+   "payment_instruction_notes": null,
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -182,17 +194,19 @@
     "line_items": 1.0,
     "bank_details": 1.0
    },
-   "extraction_warnings": [
-    "GST payable by recipient under RCM"
-   ]
+   "extraction_warnings": []
   }
  },
  {
   "file": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
-  "sha256": "bb1f8d3cbbecd97e4e3a62af09b96dc0c104237adcbc1de84063115b4a0c422b",
+  "sha256": "20090c0375b7aa0aa91c8d990fd94be333200a5d76c58e489283132984b9a562",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "repairs_and_spares",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "MEENAKSHI INDUSTRIAL SPARES CO.",
    "vendor_address": "112, SIDCO Industrial Estate, Ambattur, Chennai, Tamil Nadu 600098",
    "vendor_tax_id": "33AAHFM3098P1Z4",
@@ -228,7 +242,7 @@
    "subtotal": 480800.0,
    "discount_amount": null,
    "tax_amount": 86544.0,
-   "tax_rate_pct": 18,
+   "tax_rate_pct": 18.0,
    "shipping_amount": null,
    "round_off": null,
    "total_amount": 567344.0,
@@ -251,16 +265,20 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "Document contains a 'SECOND NOTICE' stamp."
+    "Stamp saying SECOND NOTICE present on page"
    ]
   }
  },
  {
   "file": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
-  "sha256": "b160c1327a937497eae6638fbfb4bf5854b8fb7df4ac9e26c0eff4c4d3472560",
+  "sha256": "1b894420acdef36e6549b83a7c917bd1638475b12c1785e513b4bf25aa371ffc",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "facilities_and_maintenance",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "Kesari Facility Services Pvt. Ltd.",
    "vendor_address": "No. 221, 5th Main, HSR Layout Sector 7, Bengaluru, Karnataka 560102",
    "vendor_tax_id": "29AAJCK5582N1Z8",
@@ -317,10 +335,14 @@
  },
  {
   "file": "06_variant_tolerance_pragati_PPP-7734.pdf",
-  "sha256": "3306b4be69232ee05324c893a5dbccd3e0f0e3d80bb14549dcdec0d790574e35",
+  "sha256": "584e1e9d84421da96be10e7194663ba54320326177605f19d8426b789c356f7f",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "packaging_and_raw_materials",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "Pragati Print & Packaging",
    "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
    "vendor_tax_id": "29ABBFP3374E1Z1",
@@ -383,10 +405,14 @@
  },
  {
   "file": "07_variant_missing_fields_annapurna.pdf",
-  "sha256": "c2aec724bc74cdecb4a09fe04eeabbaba176b0730ad2f8473720c5a97cccf092",
+  "sha256": "10e21621547668341f663b85d1bd8dbdd0a9262a7c5ad62d3676c83ba92f1814",
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "events",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "Annapurna Caterers",
    "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038",
    "vendor_tax_id": "29AQRPA4471H1Z5",
@@ -432,10 +458,7 @@
     "line_items": 1.0,
     "bank_details": 1.0
    },
-   "extraction_warnings": [
-    "Invoice number is missing from the document.",
-    "Invoice date is missing from the document."
-   ]
+   "extraction_warnings": []
   }
  },
  {
@@ -444,6 +467,10 @@
   "extractor": "gemini",
   "data": {
    "document_type": "invoice",
+   "bill_kind": "tax_invoice",
+   "category": "office_supplies",
+   "already_paid": false,
+   "payment_method": null,
    "vendor_name": "Sahyadri Office Supplies Pvt. Ltd.",
    "vendor_address": "No. 14, 2nd Cross, Peenya Industrial Area, Bengaluru 560058",
    "vendor_tax_id": "29AAKCS3127M1Z6",
@@ -506,11 +533,15 @@
  },
  {
   "file": "09_variant_quote_pragati_Q-2291.pdf",
-  "sha256": "c42ff6c14a341e351e795ed860f718009b15f520bd73a937d860a38939762068",
+  "sha256": "e77da4171e84c8620f8c108c9a5f6de30555e96fb93961cb397520d3c5067c4f",
   "extractor": "gemini",
   "data": {
    "document_type": "quote",
-   "vendor_name": "PRAGATI PRINT & PACKAGING",
+   "bill_kind": "other_bill",
+   "category": "packaging_and_raw_materials",
+   "already_paid": false,
+   "payment_method": null,
+   "vendor_name": "Pragati Print & Packaging",
    "vendor_address": "Plot 38, KIADB Industrial Area, Bommasandra, Bengaluru 560099",
    "vendor_tax_id": "29ABBFP3374E1Z1",
    "vendor_email": "sales@pragatiprint.in",
@@ -551,7 +582,7 @@
     "iban": null,
     "swift": null
    },
-   "payment_instruction_notes": null,
+   "payment_instruction_notes": "This is a quotation, not a request for payment. Prices are valid for 30 days. To accept, please issue a purchase order referencing Q-2291.",
    "field_confidence": {
     "vendor_name": 1.0,
     "invoice_number": 1.0,
@@ -562,8 +593,236 @@
     "bank_details": 1.0
    },
    "extraction_warnings": [
-    "Document is a quotation, not an invoice."
+    "This document is a quotation, not an invoice or bill."
    ]
+  }
+ },
+ {
+  "file": "10_bill_restaurant_truffles_TCK-0457.pdf",
+  "sha256": "2f59772a9e73775dcd0e82daceff1937dbf4e7f09711152606dff8b7c27ab069",
+  "extractor": "gemini",
+  "data": {
+   "document_type": "invoice",
+   "bill_kind": "restaurant_bill",
+   "category": "meals_and_entertainment",
+   "already_paid": true,
+   "payment_method": "card",
+   "vendor_name": "Truffles Cafe & Kitchen",
+   "vendor_address": "22, 1st Main, Koramangala 5th Block, Bengaluru 560095",
+   "vendor_tax_id": "29AABFT6612K1Z8",
+   "vendor_email": null,
+   "vendor_phone": "080 4110 2233",
+   "bill_to_name": null,
+   "invoice_number": "TCK/2611/0457",
+   "invoice_date": "2026-11-12",
+   "due_date": null,
+   "po_reference": null,
+   "payment_terms": null,
+   "currency": "INR",
+   "line_items": [
+    {
+     "description": "Veg Burger",
+     "quantity": 4,
+     "unit_price": 285.0,
+     "amount": 1140.0
+    },
+    {
+     "description": "Chicken Wings",
+     "quantity": 2,
+     "unit_price": 395.0,
+     "amount": 790.0
+    },
+    {
+     "description": "Fresh Lime Soda",
+     "quantity": 6,
+     "unit_price": 120.0,
+     "amount": 720.0
+    },
+    {
+     "description": "Sizzling Brownie",
+     "quantity": 3,
+     "unit_price": 220.0,
+     "amount": 660.0
+    }
+   ],
+   "subtotal": 3310.0,
+   "discount_amount": null,
+   "tax_amount": 165.5,
+   "tax_rate_pct": 5.0,
+   "shipping_amount": null,
+   "round_off": 0.5,
+   "total_amount": 3476.0,
+   "tax_inclusive": false,
+   "bank_details": {
+    "bank_name": null,
+    "ifsc": null,
+    "account_number": null,
+    "iban": null,
+    "swift": null
+   },
+   "payment_instruction_notes": null,
+   "field_confidence": {
+    "vendor_name": 1.0,
+    "invoice_number": 1.0,
+    "invoice_date": 1.0,
+    "po_reference": 1.0,
+    "total_amount": 1.0,
+    "line_items": 1.0,
+    "bank_details": 1.0
+   },
+   "extraction_warnings": []
+  }
+ },
+ {
+  "file": "11_bill_electricity_bescom_Nov-2026.pdf",
+  "sha256": "8a32ad78dd90d3028f83f725930ae08d2bc6ea613f0359659468bc092f8e36cc",
+  "extractor": "gemini",
+  "data": {
+   "document_type": "invoice",
+   "bill_kind": "utility_bill",
+   "category": "utilities",
+   "already_paid": false,
+   "payment_method": null,
+   "vendor_name": "Bangalore Electricity Supply Company Ltd",
+   "vendor_address": "BESCOM, K.R. Circle, Bengaluru 560001",
+   "vendor_tax_id": null,
+   "vendor_email": null,
+   "vendor_phone": "1912",
+   "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
+   "invoice_number": "2026110489213",
+   "invoice_date": "2026-11-05",
+   "due_date": "2026-11-20",
+   "po_reference": null,
+   "payment_terms": null,
+   "currency": "INR",
+   "line_items": [
+    {
+     "description": "Fixed charges (25 kW)",
+     "quantity": 25,
+     "unit_price": 110.0,
+     "amount": 2750.0
+    },
+    {
+     "description": "Energy charges",
+     "quantity": 1840,
+     "unit_price": 7.15,
+     "amount": 13156.0
+    },
+    {
+     "description": "Fuel cost adjustment (FPPCA)",
+     "quantity": 1840,
+     "unit_price": 0.32,
+     "amount": 588.8
+    },
+    {
+     "description": "Electricity tax @ 9% on energy",
+     "quantity": 1,
+     "unit_price": 1184.04,
+     "amount": 1184.04
+    }
+   ],
+   "subtotal": 17678.84,
+   "discount_amount": null,
+   "tax_amount": null,
+   "tax_rate_pct": null,
+   "shipping_amount": null,
+   "round_off": 0.16,
+   "total_amount": 17679.0,
+   "tax_inclusive": false,
+   "bank_details": {
+    "bank_name": null,
+    "ifsc": null,
+    "account_number": null,
+    "iban": null,
+    "swift": null
+   },
+   "payment_instruction_notes": "Pay online at bescom.co.in or any BBPS app before the due date to avoid disconnection.",
+   "field_confidence": {
+    "vendor_name": 1.0,
+    "invoice_number": 1.0,
+    "invoice_date": 1.0,
+    "po_reference": 1.0,
+    "total_amount": 1.0,
+    "line_items": 1.0,
+    "bank_details": 1.0
+   },
+   "extraction_warnings": []
+  }
+ },
+ {
+  "file": "12_bill_handwritten_cash_memo_lakshmi_412.jpg",
+  "sha256": "7b82643098db65d544c7756f836add3db5ddd88c1fa9a3179044484242cd09d1",
+  "extractor": "gemini",
+  "data": {
+   "document_type": "invoice",
+   "bill_kind": "retail_receipt",
+   "category": "pantry_and_housekeeping",
+   "already_paid": true,
+   "payment_method": "cash",
+   "vendor_name": "Sri Lakshmi Provision Stores",
+   "vendor_address": "Shop 6, Outer Ring Road, Marathahalli, Bengaluru",
+   "vendor_tax_id": null,
+   "vendor_email": null,
+   "vendor_phone": "98450 22671",
+   "bill_to_name": "Lumen Home Goods (office)",
+   "invoice_number": "412",
+   "invoice_date": "2026-11-11",
+   "due_date": null,
+   "po_reference": null,
+   "payment_terms": null,
+   "currency": "INR",
+   "line_items": [
+    {
+     "description": "Sugar (kg)",
+     "quantity": 5,
+     "unit_price": 48.0,
+     "amount": 240.0
+    },
+    {
+     "description": "Tea powder (kg)",
+     "quantity": 1,
+     "unit_price": 520.0,
+     "amount": 520.0
+    },
+    {
+     "description": "Milk (litre)",
+     "quantity": 20,
+     "unit_price": 56.0,
+     "amount": 1120.0
+    },
+    {
+     "description": "Biscuits (pkt)",
+     "quantity": 10,
+     "unit_price": 30.0,
+     "amount": 300.0
+    }
+   ],
+   "subtotal": 2180.0,
+   "discount_amount": null,
+   "tax_amount": null,
+   "tax_rate_pct": null,
+   "shipping_amount": null,
+   "round_off": null,
+   "total_amount": 2180.0,
+   "tax_inclusive": true,
+   "bank_details": {
+    "bank_name": null,
+    "ifsc": null,
+    "account_number": null,
+    "iban": null,
+    "swift": null
+   },
+   "payment_instruction_notes": null,
+   "field_confidence": {
+    "vendor_name": 1.0,
+    "invoice_number": 1.0,
+    "invoice_date": 1.0,
+    "po_reference": 1.0,
+    "total_amount": 1.0,
+    "line_items": 1.0,
+    "bank_details": 1.0
+   },
+   "extraction_warnings": []
   }
  }
 ]

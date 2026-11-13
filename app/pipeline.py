@@ -202,6 +202,7 @@ def _run(run_id: str, pdf: bytes, filename: str, manual: dict | None = None, sav
             po_number=(ctx.get("po") or {}).get("po_number"), duration_ms=int((time.time() - t_start) * 1000),
             extractor=(ctx.get("extract_meta") or {}).get("extractor"),
             review_status="pending" if dec["decision"] == "HOLD" else None,
+            category=inv.get("category"), bill_kind=inv.get("bill_kind"), issues=len(dec.get("issues") or []),
         )
         if dec["decision"] == "APPROVE":
             _post(ctx, "auto-approved")
@@ -287,6 +288,23 @@ def rekey(run_id: str, fields: dict, actor: str, note: str) -> str:
     db.add_audit(run_id, actor, "corrected", f"{note} → re-checked as {new_id}")
     db.add_audit(new_id, actor, "keyed_in", f"Corrected from {run_id}: {note}")
     return new_id
+
+
+BILL_KIND_NAMES = {"tax_invoice": "tax invoice", "utility_bill": "utility bill", "restaurant_bill": "restaurant bill", "retail_receipt": "shop receipt",
+                   "travel_receipt": "travel receipt", "online_order": "online order", "handwritten_bill": "handwritten bill", "other_bill": "bill"}
+CATEGORY_GL = {"office_supplies": "6100 Office Supplies", "pantry_and_housekeeping": "6120 Pantry & Housekeeping", "furniture_and_equipment": "6150 Furniture & Equipment",
+               "it_and_software": "6400 IT & Software", "professional_services": "6420 Professional Services", "facilities_and_maintenance": "6300 Facilities",
+               "utilities": "6200 Utilities", "telecom_and_internet": "6210 Telecom & Internet", "rent": "6250 Rent", "meals_and_entertainment": "6710 Meals & Entertainment",
+               "travel_and_conveyance": "6720 Travel & Conveyance", "fuel": "6730 Fuel", "logistics_and_courier": "5300 Freight & Courier",
+               "packaging_and_raw_materials": "5200 Packaging & Materials", "events": "6700 Events", "repairs_and_spares": "6600 Repairs & Maintenance",
+               "medical": "6740 Medical", "other": "6999 Other Expenses"}
+# Lenient by design: only real money risks stop a bill. Everything else is REPORTED as an issue a person can tick off.
+SOFT_CHECKS = {"val.required", "val.vendor_name", "val.confidence", "val.grounding", "val.billto", "val.date", "val.due", "val.tax", "val.currency",
+               "ven.taxid", "dup.fuzzy", "po.identify", "po.status", "po.currency", "extract.warning", "analyze.pages"}
+
+
+def category_name(c: str | None) -> str:
+    return (c or "other").replace("_and_", " & ").replace("_", " ").capitalize()
 
 
 def _po_is_vendors(po: dict, vendor: dict) -> bool:
@@ -465,6 +483,12 @@ def _normalise(d: dict) -> dict:
     inv = dict(d)
     for k in ("subtotal", "tax_amount", "shipping_amount", "total_amount", "tax_rate_pct", "round_off", "discount_amount"):
         inv[k] = r2(inv.get(k))
+    kind = inv.get("bill_kind")
+    if kind not in BILL_KIND_NAMES:  # older reads: a GSTIN or PO means a formal invoice
+        kind = "tax_invoice" if (inv.get("vendor_tax_id") or inv.get("po_reference")) else "other_bill"
+    inv["bill_kind"] = kind
+    inv["category"] = inv.get("category") if inv.get("category") in CATEGORY_GL else "other"
+    inv["already_paid"] = bool(inv.get("already_paid"))
     inv["line_items"] = [{"description": li.get("description") or "", "quantity": li.get("quantity"),
                           "unit_price": r2(li.get("unit_price")), "amount": r2(li.get("amount"))}
                          for li in (inv.get("line_items") or [])]
@@ -493,8 +517,11 @@ def st_validate(ctx):
 
     # document type
     dt = inv.get("document_type")
-    if dt == "invoice":
-        checks.append(chk("val.doctype", "Is an invoice", "pass", "Document classified as an invoice"))
+    ctx["informal"] = inv["bill_kind"] != "tax_invoice" or inv["already_paid"]  # everyday bill, or nothing left to pay
+    if dt in ("invoice", "receipt"):
+        checks.append(chk("val.doctype", "Is a bill", "pass",
+                          f"A {BILL_KIND_NAMES[inv['bill_kind']]} · {category_name(inv['category'])}"
+                          + (f" · already paid{' by ' + inv['payment_method'] if inv.get('payment_method') else ''}" if inv["already_paid"] else "")))
     elif dt == "credit_note":
         checks.append(chk("val.doctype", "Is an invoice", "fail", "This is a credit note. It goes to the credits workflow, not payment.", "hold", "ap"))
     else:
@@ -508,19 +535,20 @@ def st_validate(ctx):
         return {"summary": f"Not an invoice: this is a {label}. Filed, not paid.", "checks": checks, "data": {}}
 
     # required fields
-    missing_vendor_fix = [f for f, lbl in (("invoice_number", "invoice number"), ("invoice_date", "invoice date")) if not inv.get(f)]
-    missing_internal = [f for f in ("vendor_name", "total_amount") if inv.get(f) in (None, "")]
-    if missing_vendor_fix:
-        checks.append(chk("val.required", "Required fields present", "fail",
-                          "Missing " + " and ".join(f.replace("_", " ") for f in missing_vendor_fix)
-                          + ". The invoice can't be posted or checked for duplicates without them, so it must be reissued by the vendor.",
-                          "reject", evidence={"missing": missing_vendor_fix}))
-        ctx["return_to_vendor"] = missing_vendor_fix
-    elif missing_internal:
-        checks.append(chk("val.required", "Required fields present", "fail",
-                          "Could not find " + ", ".join(missing_internal), "hold", "ap"))
+    if inv.get("total_amount") in (None, ""):
+        checks.append(chk("val.amount", "Amount readable", "fail",
+                          "No total amount could be read, so there's nothing to pay or record. Type it in with Correct details.", "hold", "ap"))
+    missing = [f for f in ("invoice_number", "invoice_date", "vendor_name") if not inv.get(f)]
+    if missing:
+        checks.append(chk("val.required", "Bill details present", "fail",
+                          "No " + " or ".join(f.replace("_", " ") for f in missing) + " on the bill"
+                          + (". Ask the vendor for it (GST input credit needs the invoice number and date); an email is drafted below."
+                             if inv["bill_kind"] == "tax_invoice" and ("invoice_number" in missing or "invoice_date" in missing)
+                             else ". Fine for an everyday bill; repeats are still caught by seller, date and amount."),
+                          "hold", "ap", evidence={"missing": missing}))
+        ctx["return_to_vendor"] = [m for m in missing if m != "vendor_name"]
     else:
-        checks.append(chk("val.required", "Required fields present", "pass", "Invoice number, date, vendor and total all present"))
+        checks.append(chk("val.required", "Bill details present", "pass", "Bill number, date, seller and total all present"))
 
     # line arithmetic
     lines = inv["line_items"]
@@ -670,6 +698,20 @@ def st_vendor(ctx):
                               "hold", "ap", evidence={"candidates": cands}))
             ctx["halt_po"] = True
             return {"summary": "Vendor could not be identified.", "checks": checks, "data": {"candidates": cands}}
+        if ctx.get("informal"):  # an everyday seller, or nothing left to pay: learn them, nothing to verify
+            best = db.vendor_add_from_invoice(inv, ctx["run_id"], status="active", source="first bill")
+            ctx["vendor"] = best
+            checks.append(chk("ven.match", "Vendor on file", "info",
+                              f"New seller {best['legal_name']} ({best['vendor_id']}) added to the vendor list from this {BILL_KIND_NAMES[inv['bill_kind']]}. "
+                              + ("Already paid, so there's nothing to verify." if inv["already_paid"] else "Everyday bill, so no verification is needed.")))
+            ctx["fraud_signals"] = []
+            note = inv.get("payment_instruction_notes") or ""
+            if re.search(r"(new|changed?|update[ds]?)\s+(bank|account|banking|remit)|changed banks", note, re.I):
+                ctx["fraud_signals"].append("bill announces a change of bank details")
+                checks.append(chk("ven.change_notice", "Change-of-bank language", "fail", f"Bill text: “{note[:160]}”.", "hold", "fraud"))
+            return {"summary": f"New seller added: {best['legal_name']} ({best['vendor_id']}).", "checks": checks,
+                    "data": {"vendor": {k: best[k] for k in ("vendor_id", "legal_name", "status", "payment_terms", "phone_on_file", "email_domain")},
+                             "new_vendor": True, "candidates": cands, "fraud_signals": ctx["fraud_signals"]}}
         best = db.vendor_add_from_invoice(inv, ctx["run_id"])
         ctx["vendor"], ctx["new_vendor"] = best, True
         b = best["bank"]
@@ -767,9 +809,19 @@ def st_duplicates(ctx):
     else:
         checks.append(chk("dup.hash", "Exact file seen before", "pass", "New file fingerprint"))
     if not vendor or not inv.get("invoice_number"):
-        checks.append(chk("dup.number", "Invoice number not already booked", "skip",
-                          "Needs a matched vendor and an invoice number"))
-        return {"summary": "Duplicate check limited (missing vendor or number).", "checks": checks, "data": {}}
+        d0, tot = iso(inv.get("invoice_date")), inv.get("total_amount")
+        same = [r for r in db.ledger_rows() if vendor and r["vendor_id"] == vendor["vendor_id"] and tot is not None and r["total_amount"] is not None
+                and abs(r["total_amount"] - tot) <= max(small(P, tot), 0.05) and d0 and iso(r["invoice_date"]) == d0]
+        if same:
+            ctx["duplicate_of"] = same[0]
+            checks.append(chk("dup.number", "Not already booked", "fail",
+                              f"No bill number, but the same seller, date and amount ({money(tot)} on {d0}) is already booked"
+                              + (f" ({same[0]['payment_ref']})" if same[0].get("payment_ref") else "") + ". This is a repeat.", "reject"))
+        else:
+            checks.append(chk("dup.number", "Not already booked", "pass" if vendor and tot is not None and d0 else "skip",
+                              "No bill number; checked seller + date + amount instead: no match" if vendor and tot is not None and d0
+                              else "Needs a seller, date and amount to check for repeats"))
+        return {"summary": "Repeat check by seller, date and amount.", "checks": checks, "data": {}}
 
     n = db.norm_invoice_no(inv["invoice_number"])
     ledger = [r for r in db.ledger_rows() if r["vendor_id"] == vendor["vendor_id"]]
@@ -864,7 +916,7 @@ def st_po_match(ctx):
         po = next((p for p in pos if p["po_number"] == ref), None) or \
              next((p for p in pos if re.sub(r"[^0-9]", "", p["po_number"]) == nref and nref), None)
         if po and not _po_is_vendors(po, vendor):
-            checks.append(chk("po.identify", "PO identified", "fail",
+            checks.append(chk("po.vendor", "PO belongs to this vendor", "fail",
                               f"{po['po_number']} belongs to a different vendor ({po['vendor_id']})", "hold", "procurement"))
             return {"summary": "PO quoted belongs to another vendor.", "checks": checks, "data": {}}
         if po:
@@ -893,10 +945,13 @@ def st_po_match(ctx):
         cands.sort(key=lambda c: -c["confidence"])
         inference = {"candidates": cands}
         if not cands:
-            checks.append(chk("po.identify", "PO identified", "fail",
-                              "No PO quoted and the vendor has no open POs. Treat as a non-PO invoice that needs budget-owner approval.",
-                              "hold", "procurement"))
-            return {"summary": "No PO and no open POs for this vendor.", "checks": checks, "data": {"inference": inference}}
+            cat = category_name(inv.get("category"))
+            if ctx.get("informal"):
+                checks.append(chk("po.identify", "PO identified", "info", f"Everyday bill: no purchase order needed. Booked as {cat}."))
+            else:
+                checks.append(chk("po.identify", "PO identified", "fail",
+                                  f"No purchase order for this bill. Booked as a non-PO {cat} expense; the budget owner can review it.", "hold", "procurement"))
+            return {"summary": f"No PO: booked as {cat}.", "checks": checks, "data": {"inference": inference}}
         top = cands[0]
         margin = top["confidence"] - (cands[1]["confidence"] if len(cands) > 1 else 0)
         po = next(p for p in pos if p["po_number"] == top["po_number"])
@@ -1025,6 +1080,14 @@ DOC_TYPE_NAMES = {"quote": "quote", "statement": "statement of account", "purcha
 
 def st_decision(ctx):
     trace = ctx["trace"]
+    issues = []
+    for k, s in trace["stages"].items():
+        for c in s.get("checks", []):
+            if c.get("outcome") in ("hold", "reject") and c["id"] in SOFT_CHECKS:
+                c.update(outcome=None, status="warn", reported=True)
+            if c.get("reported") or (c["status"] == "warn" and c["id"] in SOFT_CHECKS):
+                c["reported"] = True
+                issues.append({"id": c["id"], "label": c["label"], "detail": c["detail"], "stage": k})
     all_checks = [c for k, s in trace["stages"].items() for c in s.get("checks", [])]
     rejects = [c for c in all_checks if c["outcome"] == "reject"]
     holds = [c for c in all_checks if c["outcome"] == "hold"]
@@ -1033,7 +1096,8 @@ def st_decision(ctx):
     vendor = ctx.get("vendor") or {}
     po = ctx.get("po") or {}
     P = ctx["policy"]
-    out = {"reasons": [], "next_actions": [], "vendor_email": None, "internal_task": None, "payment": None}
+    out = {"reasons": [], "next_actions": [], "vendor_email": None, "internal_task": None, "payment": None, "issues": issues,
+           "category": inv.get("category"), "bill_kind": inv.get("bill_kind"), "already_paid": inv.get("already_paid")}
 
     if ctx.get("not_invoice"):
         label = ctx["not_invoice"]
@@ -1109,15 +1173,25 @@ def st_decision(ctx):
             out["next_actions"] = ["Reviewer checks the flagged items against the PDF, then approves or rejects with a note"]
     else:
         out["decision"] = "APPROVE"
-        out["route_name"] = "Auto-approved → payment run"
         how = ctx.get("po_how")
-        out["headline"] = (f"Approved: {money(inv.get('total_amount'))} to {vendor.get('legal_name')}, matched to {po.get('po_number')}"
-                           + (" (PO inferred, not quoted)" if how == "inferred" else "") + ".")
-        out["reasons"] = ["All checks passed"] + [f"Note: {c['detail']}" for c in warns if c["id"] not in ("dup.hash",)]
+        paid = inv.get("already_paid")
+        out["route_name"] = "Recorded: already paid" if paid else "Auto-approved → payment run"
+        what = f"{money(inv.get('total_amount'))} {'at' if paid else 'to'} {vendor.get('legal_name') or inv.get('vendor_name') or 'the seller'}"
+        out["headline"] = ((f"Recorded: {what}, already paid{' by ' + inv['payment_method'] if inv.get('payment_method') else ''}"
+                            if paid else f"Approved: {what}")
+                           + (f", matched to {po.get('po_number')}" + (" (PO inferred, not quoted)" if how == "inferred" else "") if po else f" · {category_name(inv.get('category'))}")
+                           + (f". {len(issues)} issue{'s' if len(issues) != 1 else ''} reported to tick off." if issues else "."))
+        out["reasons"] = (["All checks passed"] if not issues else [f"Passed, with {len(issues)} reported issue{'s' if len(issues) != 1 else ''} (not blocking)"]) + \
+            [f"Note: {c['detail']}" for c in warns if c["id"] not in ("dup.hash",) and not c.get("reported")]
         out["payment"] = _payment_plan(inv, vendor, po, ctx)
-        out["next_actions"] = ["Posted to the invoice ledger", f"Scheduled for payment on {out['payment']['pay_on']}"]
+        out["next_actions"] = (["Recorded in the books as already paid; reimburse the employee if they paid personally"] if paid else
+                               ["Posted to the invoice ledger", f"Scheduled for payment on {out['payment']['pay_on']}"])
+        if issues:
+            out["next_actions"].append("Tick off the reported issues once you've looked at them")
         if how == "inferred":
             out["next_actions"].append("Ask the vendor to quote the PO number on future invoices")
+        if ctx.get("return_to_vendor") and inv.get("bill_kind") == "tax_invoice":
+            out["vendor_email"] = _email_ask_details(inv, vendor, ctx["return_to_vendor"], po)
 
     counts = {s: sum(1 for c in all_checks if c["status"] == s) for s in ("pass", "warn", "fail", "info", "skip")}
     out["check_counts"] = counts
@@ -1128,7 +1202,7 @@ def st_decision(ctx):
 def _payment_plan(inv, vendor, po, ctx) -> dict:
     terms = parse_terms(inv.get("payment_terms") or vendor.get("payment_terms"))
     d = iso(inv.get("invoice_date")) or TODAY()
-    due = d + timedelta(days=terms["net_days"])
+    due = iso(inv.get("due_date")) or d + timedelta(days=terms["net_days"])
     plan = {"terms": inv.get("payment_terms") or vendor.get("payment_terms"), "due_date": due.isoformat(), "pay_on": due.isoformat(),
             "pay_to": (f"{vendor['bank']['bank_name'] or 'Bank'} ••••{vendor['bank']['account_number'][-4:]} (verified account on file)"
                        if vendor.get("bank", {}).get("account_number") else "The vendor's verified bank account (to be confirmed by Vendor Management before release)"),
@@ -1142,11 +1216,17 @@ def _payment_plan(inv, vendor, po, ctx) -> dict:
                          "discount_note": f"Pay by {disc_by.isoformat()} to capture {terms['discount_pct']:g}% early-payment discount ({money(saving)})"})
     gl = {}
     for row in ctx["trace"]["stages"].get("po_match", {}).get("data", {}).get("lines", []):
-        acct = row.get("gl") or (po["lines"][0]["gl_account"] if po else "2000 Suspense")
+        acct = row.get("gl") or (po["lines"][0]["gl_account"] if po else CATEGORY_GL.get(inv.get("category"), "6999 Other Expenses"))
         gl[acct] = round(gl.get(acct, 0) + (row["qty"] or 0) * (row.get("inv_price") or 0), 2)
+    if not gl:  # no PO: book the whole net amount to the bill's category
+        gl[CATEGORY_GL.get(inv.get("category"), "6999 Other Expenses")] = round(ctx.get("net_amount") or inv.get("total_amount") or 0, 2)
     if inv.get("tax_amount"):
         gl["GST input tax credit (CGST/SGST/IGST receivable)"] = inv["tax_amount"]
     plan["gl_coding"] = [{"account": k, "amount": v} for k, v in gl.items()]
+    if inv.get("already_paid"):
+        plan.update(pay_on=d.isoformat(), due_date=d.isoformat(), terms="Already paid",
+                    pay_to=f"Already paid{' by ' + inv['payment_method'] if inv.get('payment_method') else ''}: nothing to transfer",
+                    discount_note=None)
     plan["cost_center"] = po.get("cost_center")
     return plan
 
@@ -1160,7 +1240,19 @@ def _email_missing(inv, vendor, missing, po) -> dict:
                     + (f" against PO {inv.get('po_reference')}" if inv.get("po_reference") else "") +
                     ". We're unable to process it because the following required information is missing:\n\n"
                     f"{items}\n\nPlease reissue the invoice with these details and send it to ap@lumenhomegoods.com. "
-                    "Payment terms will start from the date we receive the corrected invoice.\n\nKind regards,\nAccounts Payable, Lumen Home Goods, Inc."}
+                    "Payment terms will start from the date we receive the corrected invoice.\n\nKind regards,\nAccounts Payable, Lumen Home Goods Pvt. Ltd."}
+
+
+def _email_ask_details(inv, vendor, missing, po) -> dict:
+    """The bill is approved; we just need the missing details for our records and GST input credit."""
+    items = "\n".join(f"  • {m.replace('_', ' ').capitalize()}" for m in missing)
+    ref = f" against PO {po.get('po_number') or inv.get('po_reference')}" if (po or inv.get("po_reference")) else ""
+    return {"to": inv.get("vendor_email") or f"ap@{vendor.get('email_domain') or 'vendor.com'}",
+            "subject": f"Details needed for your invoice of {money(inv.get('total_amount'))}{ref}",
+            "body": f"Hello {vendor.get('legal_name', 'team')},\n\nThank you for your invoice for {money(inv.get('total_amount'))}{ref}. "
+                    "We've processed it for payment, but it doesn't show the following:\n\n"
+                    f"{items}\n\nCould you send these (or a corrected copy of the invoice)? We need them for our records and to claim GST input credit.\n\n"
+                    "Kind regards,\nAccounts Payable, Lumen Home Goods Pvt. Ltd."}
 
 
 def _email_duplicate(inv, vendor, d) -> dict:
@@ -1170,7 +1262,7 @@ def _email_duplicate(inv, vendor, d) -> dict:
                     f"Our records show this invoice was already processed as {d.get('invoice_number')} on {d.get('posted_at')}"
                     + (f" and paid under reference {d['payment_ref']}" if d.get("payment_ref") else "") +
                     ". We won't be issuing a second payment. If you believe this is in error, please send a statement of account "
-                    "and we'll reconcile it with you.\n\nKind regards,\nAccounts Payable, Lumen Home Goods, Inc."}
+                    "and we'll reconcile it with you.\n\nKind regards,\nAccounts Payable, Lumen Home Goods Pvt. Ltd."}
 
 
 STAGE_FNS = {"intake": st_intake, "analyze": st_analyze, "extract": st_extract, "validate": st_validate,

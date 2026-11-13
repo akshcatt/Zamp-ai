@@ -121,11 +121,15 @@ const icon = {
 const DEC_LABEL = { APPROVE: "Approved", HOLD: "Needs review", REJECT: "Rejected", NOT_INVOICE: "Not an invoice" };
 const STATUS_LABEL = { pass: "OK", warn: "Heads-up", fail: "Problem", info: "FYI", skip: "Skipped" };
 // Backend queue/route names → the words a non-specialist would use.
+const KIND_NAME = { tax_invoice: "Tax invoice", utility_bill: "Utility bill", restaurant_bill: "Restaurant bill", retail_receipt: "Shop receipt",
+  travel_receipt: "Travel receipt", online_order: "Online order", handwritten_bill: "Handwritten bill", other_bill: "Bill" };
+const catName = (c) => (c || "other").replace(/_and_/g, " & ").replace(/_/g, " ").replace(/^./, (x) => x.toUpperCase());
+const openIssues = (r) => Math.max(0, (r.issues || 0) - (r.issues_ticked || 0));
 const FRIENDLY = {
   "Treasury & Fraud": "Fraud check team", "Controller approval": "Finance manager", "Procurement / Buyer": "Purchasing team",
   "Vendor Management": "Vendor setup team", "AP Specialist": "Accounts payable team",
   "Auto-approved → payment run": "Scheduled for payment", "Rejected: duplicate": "Blocked: already billed",
-  "Rejected: blocked vendor": "Blocked: vendor is on hold", "Returned to vendor": "Sent back to vendor", Rejected: "Rejected", "Filed: not an invoice": "Filed for reference",
+  "Rejected: blocked vendor": "Blocked: vendor is on hold", "Recorded: already paid": "Recorded as already paid", "Returned to vendor": "Sent back to vendor", Rejected: "Rejected", "Filed: not an invoice": "Filed for reference",
 };
 const friendly = (n) => FRIENDLY[n] || n || "";
 const QUEUE_KEYS = { fraud: "Treasury & Fraud", controller: "Controller approval", procurement: "Procurement / Buyer", vendor_mgmt: "Vendor Management", ap: "AP Specialist" };
@@ -334,6 +338,7 @@ async function viewDashboard() {
     <h1>${s.processed ? `${s.processed} invoice${s.processed === 1 ? "" : "s"} handled. <em>${s.touchless_rate}% needed no one.</em>` : `Invoices in, decisions out. <em>Upload one to start.</em>`}</h1>
     <p class="muted" style="margin:0;max-width:640px;font-size:16px">NoCap reads every GST invoice, checks it against your purchase orders, vendors and past payments, then pays it, routes it to the right person, or rejects it, and tells you exactly why. No guesswork, no cap.</p>
     <div class="row">
+      ${s.open_issues ? `<button class="attn issues-attn" id="issues-attn"><b>${s.open_issues}</b>issue${s.open_issues === 1 ? "" : "s"} to tick off →</button>` : ""}
       ${pending.length ? `<a class="attn" href="#/queue"><b>${pending.length}</b>${pending.length === 1 ? "invoice is" : "invoices are"} waiting for you${sla.late ? ` · ${sla.late} overdue` : ""} →</a>` : `<span class="attn ok"><b>0</b>Nothing waiting for review</span>`}
       <a class="btn primary" href="#/inbox">${icon.upload} Upload an invoice</a>
     </div>
@@ -359,11 +364,15 @@ async function viewDashboard() {
     ${chartCard("reasons", "Why invoices were stopped", "The checks that sent invoices to a person or rejected them", reasonsChart(a.reasons))}
     ${chartCard("teams", "Who's reviewing", a.reviews.count ? `${a.reviews.count} decided by people · avg ${dur(a.reviews.avg_seconds)} to decide` : "Held invoices by team, and what reviewers decided", teamsChart(a.teams))}
   </div>
-  ${sectionTitle("Spend &amp; engine", "Where the money goes and how the engine performs")}
-  <div class="grid chart-row r-1-1-1">
-    ${chartCard("stages", "Where the time goes", "Average time per step", stagesChart(a.stage_ms))}
+  ${sectionTitle("Spend", "What the money went on, across every kind of bill")}
+  <div class="grid chart-row r-1-1">
+    ${chartCard("categories", "Spend by category", "Every bill is categorised automatically, formal or not", categoriesChart(a.categories || []))}
     ${chartCard("vendors", "Top vendors", "Approved spend by vendor", vendorsChart(a.vendors))}
-    ${chartCard("readers", "How invoices were read", "Who copied the details off the document", readersChart(a.readers))}
+  </div>
+  ${sectionTitle("Engine", "How the checks perform")}
+  <div class="grid chart-row r-1-1">
+    ${chartCard("stages", "Where the time goes", "Average time per step", stagesChart(a.stage_ms))}
+    ${chartCard("readers", "How bills were read", "Who copied the details off the document", readersChart(a.readers))}
   </div>
 
   ${sectionTitle("Milestones", "Wins your team has earned")}
@@ -375,7 +384,7 @@ async function viewDashboard() {
           ${s.archived || dash.archived ? `<button class="linkish" id="arch-toggle">${dash.archived ? "← Back to the working list" : `View archived (${s.archived})`}</button>` : ""}</div>
         <div class="toolbar">
           <label class="search">${icon.search}<input id="q" placeholder="Search vendor, invoice #, PO" value="${esc(dash.q)}"></label>
-          <div class="chips" id="chips">${[["all", "All"], ["APPROVE", "Approved"], ["HOLD", "Needs review"], ["REJECT", "Rejected"], ["NOT_INVOICE", "Filed"]].map(([k, l]) => `<button data-f="${k}" class="${dash.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
+          <div class="chips" id="chips">${[["all", "All"], ["APPROVE", "Approved"], ["HOLD", "Needs review"], ["REJECT", "Rejected"], ["NOT_INVOICE", "Filed"], ["ISSUES", "Has issues"]].map(([k, l]) => `<button data-f="${k}" class="${dash.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
           <div class="menu"><button class="btn sm ghost" id="exp" aria-haspopup="true">${icon.download} Export</button>
             <div class="menu-pop" id="exp-pop" hidden><a href="/api/export.xlsx" download>Excel workbook <span class="faint">invoices, exceptions, ledger</span></a><a href="/api/export.csv" download>CSV <span class="faint">one row per invoice</span></a><button type="button" id="csv">CSV of this filtered view</button></div></div>
           ${dash.archived ? "" : `<button class="btn sm ghost" id="archive" title="Move finished invoices off this list. Nothing is deleted.">Archive finished</button>`}
@@ -399,12 +408,12 @@ async function viewDashboard() {
   </div>`;
 
   const base = dash.archived ? archivedRuns : runs;
-  const filtered = () => { const q = dash.q.trim().toLowerCase(); return base.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
-      && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to)].join(" ").toLowerCase().includes(q))); };
+  const filtered = () => { const q = dash.q.trim().toLowerCase(); return base.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "ISSUES" && openIssues(r) > 0) || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
+      && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to), catName(r.category)].join(" ").toLowerCase().includes(q))); };
   const paint = () => {
     const q = dash.q.trim().toLowerCase();
-    const rows = base.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
-      && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to)].join(" ").toLowerCase().includes(q)));
+    const rows = base.filter((r) => (dash.filter === "all" || outcome(r) === dash.filter || (dash.filter === "ISSUES" && openIssues(r) > 0) || (dash.filter === "HOLD" && r.decision === "HOLD" && (r.review_status || "pending") === "pending"))
+      && (!q || [r.vendor_name, r.invoice_number, r.po_number, r.filename, friendly(r.route_to), catName(r.category)].join(" ").toLowerCase().includes(q)));
     $("#runs-table").innerHTML = !base.length && dash.archived ? `<div class="empty">Nothing archived.</div>`
       : !base.length
       ? `<div class="empty"><div class="big">No invoices yet</div>Upload one, or try the sample inbox.<br><br><a class="btn primary" href="#/inbox">${icon.upload} Upload an invoice</a></div>`
@@ -412,7 +421,8 @@ async function viewDashboard() {
       : `<div class="table-wrap"><table>
         <thead><tr><th>Vendor</th><th class="num">Amount</th><th>Result</th><th>Next step</th><th class="num">Received</th>${dash.archived ? "<th></th>" : ""}</tr></thead>
         <tbody>${rows.map((r) => `<tr class="click" onclick="location.hash='#/runs/${r.id}'">
-          <td class="vcell"><b>${esc(r.vendor_name || r.filename)}</b><div class="faint mono">${esc(r.invoice_number || "no invoice #")}${r.po_number ? " · " + esc(r.po_number) : ""}</div></td>
+          <td class="vcell"><b>${esc(r.vendor_name || r.filename)}</b><div class="faint mono">${esc(r.invoice_number || "no bill #")}${r.po_number ? " · " + esc(r.po_number) : ""}</div>
+            ${r.category ? `<span class="cat-chip">${esc(catName(r.category))}</span>` : ""}${openIssues(r) ? `<span class="iss-chip">${openIssues(r)} to tick</span>` : ""}</td>
           <td class="num">${money(r.total)}</td>
           <td>${decBadge(r.decision, r.review_status, r.status)}</td>
           <td class="muted" style="white-space:nowrap">${esc(r.status === "running" ? "Checking now…" : friendly(r.route_to))}</td>
@@ -435,6 +445,7 @@ async function viewDashboard() {
     card.classList.toggle("as-table", dash.tables[id]);
     b.textContent = dash.tables[id] ? "Chart" : "Table";
   }));
+  $("#issues-attn") && ($("#issues-attn").onclick = () => { dash.filter = "ISSUES"; paint(); $$("#chips button").forEach((b) => b.classList.toggle("on", b.dataset.f === "ISSUES")); $("#runs-table").scrollIntoView({ behavior: "smooth", block: "start" }); });
   $("#arch-toggle") && ($("#arch-toggle").onclick = () => { dash.archived = !dash.archived; dash.filter = "all"; viewDashboard(); });
   $("#archive") && ($("#archive").onclick = async () => {
     if (!(await ask({ title: "Archive every finished invoice?", ok: "Archive", icon: icon.archive,
@@ -560,6 +571,11 @@ function stagesChart(st) {
     table: tableHtml(["Step", "Average", "Slowest"], st.map((x) => [STAGE_NAME[x.stage] || x.stage, secs(x.avg_ms), secs(x.max_ms)])) };
 }
 
+function categoriesChart(c) {
+  if (!c.length) return emptyChart("No bills yet.");
+  return { chart: hbars(c.map((x) => ({ label: x.label, value: x.total, tip: `${esc(x.label)}: ${money(x.total)} across ${x.count} bill${x.count === 1 ? "" : "s"}` })), { fmt: kmoney }),
+    table: tableHtml(["Category", "Bills", "Amount"], c.map((x) => [esc(x.label), x.count, money(x.total)])) };
+}
 function vendorsChart(v) {
   if (!v.length) return emptyChart("No approved spend yet.");
   return { chart: hbars(v.map((x) => ({ label: x.vendor, value: x.total, tip: `${esc(x.vendor)}: ${money(x.total)} across ${x.count} invoice${x.count === 1 ? "" : "s"}` })), { fmt: kmoney }),
@@ -725,7 +741,7 @@ async function viewRun(id, query) {
     r = r || (await api(`/api/runs/${id}`));
     st.run = r; st.running = false;
     $("#rh-title").textContent = r.vendor_name ? `${r.vendor_name} · ${r.decision === "NOT_INVOICE" ? "not an invoice" : r.invoice_number || "no invoice #"}` : r.filename;
-    $("#rh-meta").innerHTML = `${esc(r.filename)} · received ${when(r.created_at)} · checked in ${secs(r.duration_ms)} · read by <b>${esc(READER_NAME[r.extractor] || r.extractor || "nobody yet (needs keying)")}</b>`;
+    $("#rh-meta").innerHTML = `${r.category ? `<span class="cat-chip">${esc(catName(r.category))}</span> ${esc(KIND_NAME[r.bill_kind] || "")} · ` : ""}${esc(r.filename)} · received ${when(r.created_at)} · checked in ${secs(r.duration_ms)} · read by <b>${esc(READER_NAME[r.extractor] || r.extractor || "nobody yet (needs keying)")}</b>`;
     render(); renderReview(st); refreshChrome();
   };
 
@@ -771,6 +787,8 @@ function renderTimeline(st) {
 
 function plainSentence(d) {
   const team = friendly(d.route_name);
+  if (d.decision === "APPROVE" && d.already_paid) return `Already paid, so there's nothing to transfer. It's recorded under ${catName(d.category)} so the spend shows up in your reports.${(d.issues || []).length ? " A few things were noted below; tick them off when you've looked." : ""}`;
+  if (d.decision === "APPROVE" && (d.issues || []).length) return `Approved and scheduled. A few things were noted below: they don't block payment, tick them off once you've looked.`;
   if (d.decision === "NOT_INVOICE") return "Nothing to pay. This isn't a bill, so it's filed for reference and doesn't count as a rejection. If it really is an invoice, correct the details below to re-check it.";
   if (d.decision === "APPROVE") return "Everything checked out. It has been recorded and scheduled for payment, and nobody had to touch it.";
   if (d.decision === "HOLD") return `Something needs a person to look at it. It's waiting with the ${team.toLowerCase()}${d.sla ? `, who should answer within ${d.sla.toLowerCase()}` : ""}. Nothing gets paid until they do.`;
@@ -791,9 +809,11 @@ function renderDecision(st) {
       ${d.money_protected ? `<span class="protected">${icon.shield} ${money(d.money_protected)} protected</span>` : ""}
       ${(d.also_notify || []).length ? `<span class="sla">· also telling ${d.also_notify.map((n) => esc(friendly(n))).join(", ")}</span>` : ""}</div>
     <div class="headline">${esc(d.headline)}</div>
-    ${canVerify ? `<div class="fixbar" id="fixbar"><span class="fb-ic">${icon.shield}</span><div class="fb-t"><b>Fix it here:</b> verify this vendor once. The invoice is then re-checked automatically.</div>
-      <button class="btn ok sm" onclick="verifyHere()">${icon.shield} Verify vendor &amp; re-check</button><button class="btn ghost sm" onclick="blockVendor(vendorToVerify(_st), () => router())">Block</button></div>` : ""}
+    ${canVerify ? `<div class="fixbar" id="fixbar"><span class="fb-ic">${icon.shield}</span><div class="fb-t"><b>Fix it here:</b> check the vendor's GSTIN on the GST portal and confirm their bank, then verify them once. The invoice is re-checked automatically.
+        <div class="fb-d" id="fb-details"></div></div>
+      <button class="btn ok sm" id="verify-btn" onclick="verifyHere()">${icon.shield} Verify vendor &amp; re-check</button></div>` : ""}
     <p class="plain">${esc(plainSentence(d))}</p>
+    ${(d.issues || []).length && st.run.review_status !== "corrected" ? issuesHtml(st) : ""}
     <div class="tally"><span class="p">${c.pass} OK</span><span class="w">${c.warn} heads-up</span><span class="f">${c.fail} problem${c.fail === 1 ? "" : "s"}</span><span>${c.info + c.skip} FYI / skipped</span></div>
     <div class="cols">
       <div><h3>Why</h3><ul>${d.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>
@@ -809,7 +829,33 @@ function renderDecision(st) {
       <div class="email"><div class="hdr"><b>To:</b> ${esc(d.vendor_email.to)}<br><b>Subject:</b> ${esc(d.vendor_email.subject)}</div>${esc(d.vendor_email.body)}</div></div>` : ""}
   </div>`;
   if (fixedNote) showFixedResult(st);
+  if (canVerify) api("/api/vendors").then(({ vendors }) => {
+    const v = vendors.find((x) => x.vendor_id === canVerify), box = $("#fb-details");
+    if (v && box) box.innerHTML = [`<b>${esc(v.name)}</b>`, v.tax_id ? `GSTIN <span class="mono">${esc(v.tax_id)}</span>` : "no GSTIN printed",
+      esc(v.bank) + (v.ifsc ? ` · IFSC <span class="mono">${esc(v.ifsc)}</span>` : ""), v.email_domain ? `<span class="mono">${esc(v.email_domain)}</span>` : ""].filter(Boolean).join(" · ");
+  }).catch(() => {});
 }
+
+/* ---- reported issues: never blocking, ticked off by a person */
+function issuesHtml(st) {
+  const d = st.decision, t = st.run.ticks || {}, done = d.issues.filter((i) => t[i.id]).length;
+  return `<div class="issues" id="issues"><div class="iss-head"><b>Reported issues</b><span class="faint small">${done} of ${d.issues.length} ticked · these don't block payment, they're here for you to look at</span></div>
+    ${d.issues.map((i) => `<label class="iss ${t[i.id] ? "done" : ""}"><input type="checkbox" data-issue="${esc(i.id)}" ${t[i.id] ? "checked" : ""}>
+      <div><b>${esc(i.label)}</b><div class="small muted">${esc(i.detail)}</div>${t[i.id] ? `<div class="faint small">Ticked by ${esc(t[i.id].actor)} · ${ago(t[i.id].ts)}</div>` : ""}</div></label>`).join("")}</div>`;
+}
+document.addEventListener("change", async (e) => {
+  const box = e.target.closest("[data-issue]");
+  if (!box || !window._st) return;
+  const st = window._st;
+  box.disabled = true;
+  try {
+    const out = await postJSON(`/api/runs/${st.run.id}/issues/${encodeURIComponent(box.dataset.issue)}`, { done: box.checked, actor: reviewer() });
+    st.run.ticks = out.ticks;
+    const all = (st.decision.issues || []).every((i) => out.ticks[i.id]);
+    renderDecision(st); refreshChrome();
+    if (box.checked && all) toast("All issues ticked off. Nice and tidy.", "win");
+  } catch (err) { box.checked = !box.checked; box.disabled = false; toast(err.message, "error"); }
+});
 
 /* ---- verify a new vendor right where the problem is shown, then confirm the fix automatically */
 function vendorToVerify(st) {
@@ -832,11 +878,13 @@ function resultLine(r) {
 }
 async function verifyHere() {
   const st = window._st, vid = vendorToVerify(st);
-  if (!vid) return;
+  if (!vid || verifyHere.busy) return;
   if (!(await ask({ title: "Verify this vendor?", ok: "Verify & re-check", icon: icon.shield,
     body: "Do this after checking their GSTIN on the GST portal and confirming the bank account. Their details then become the reference, and this invoice is re-checked against every rule straight away." }))) return;
   const bar = $("#fixbar");
   const say = (html, cls = "") => { if (bar) { bar.className = "fixbar " + cls; bar.innerHTML = html; } };
+  verifyHere.busy = true;
+  $$("#review .btn").forEach((b) => (b.disabled = true));  // nothing else to click while it re-checks
   try {
     say(`<span class="spin"></span><div class="fb-t"><b>Vendor verified.</b> Re-checking this invoice against every rule…</div>`, "busy");
     await postJSON(`/api/vendors/${vid}/verify`, { actor: reviewer() });
@@ -844,11 +892,13 @@ async function verifyHere() {
     if (!next) { say(`<div class="fb-t"><b>Vendor verified.</b> Nothing was waiting to re-check.</div>`, "done"); refreshChrome(); return; }
     const r = await waitForRun(next);
     const ok = r.decision === "APPROVE";
-    say(`<span class="fb-ic">${ok ? icon.check : icon.alert}</span><div class="fb-t">${resultLine(r)}</div><a class="btn sm ${ok ? "ok" : ""}" href="#/runs/${r.id}">Open the re-checked invoice →</a>`, ok ? "done" : "partial");
+    st.run = await api(`/api/runs/${st.run.id}`);  // this invoice is now superseded: redraw everything from the new state
+    renderDecision(st); renderDetail(st); renderReview(st);
     toast(ok ? "Issue fixed: vendor verified and the invoice approved" : "Vendor verified. The invoice still needs a look for another reason.", ok ? "win" : "info");
     refreshChrome();
     if (ok) setTimeout(() => { if (location.hash.includes(st.run.id)) location.hash = `#/runs/${r.id}`; }, 2500);
-  } catch (e) { say(`<div class="fb-t">${esc(e.message)}</div>`, "partial"); toast(e.message, "error"); }
+  } catch (e) { say(`<div class="fb-t">${esc(e.message)}</div>`, "partial"); toast(e.message, "error"); $$("#review .btn").forEach((b) => (b.disabled = false)); }
+  finally { verifyHere.busy = false; }
 }
 async function showFixedResult(st) {
   const next = latestVersionOf(st.run), el = $("#fixed-note");
@@ -886,8 +936,7 @@ const stageDataLabel = (k) => ({ extract: "What the AI read", po_match: "Line by
 const checksHtml = (cs) => cs.length ? `<div class="checks">${cs.map((c) => `<div class="check ${c.status}">
   <div><span class="badge ${c.status}">${STATUS_LABEL[c.status]}</span></div>
   <div style="min-width:0"><div class="lbl">${esc(c.label)}</div><div class="det">${esc(c.detail)}</div>
-  ${c.outcome ? `<div class="route-tag">→ ${c.outcome === "reject" ? "rejects the invoice" : `sends it to the ${esc(friendly(QUEUE_KEYS[c.route] || "AP Specialist").toLowerCase())}`}</div>` : ""}
-  ${c.status === "fail" && /^ven\.(match|status)$/.test(c.id || "") && vendorToVerify(window._st) ? `<button class="btn ok sm" style="margin-top:10px" onclick="verifyHere()">${icon.shield} Verify vendor &amp; re-check</button>` : ""}</div></div>`).join("")}</div>` : "";
+  ${c.outcome ? `<div class="route-tag">→ ${c.outcome === "reject" ? "rejects the invoice" : `sends it to the ${esc(friendly(QUEUE_KEYS[c.route] || "AP Specialist").toLowerCase())}`}</div>` : ""}</div></div>`).join("")}</div>` : "";
 
 const FIELD_LIST = [["vendor_name", "Vendor"], ["invoice_number", "Invoice #"], ["invoice_date", "Invoice date"], ["due_date", "Due date"], ["po_reference", "Order (PO) #"], ["payment_terms", "Payment terms"],
   ["currency", "Currency"], ["bill_to_name", "Billed to"], ["vendor_email", "Sender email"], ["vendor_tax_id", "GSTIN"], ["subtotal", "Subtotal", 1], ["discount_amount", "Discount", 1], ["tax_amount", "GST", 1], ["shipping_amount", "Shipping", 1], ["round_off", "Round off", 1], ["total_amount", "Total", 1]];
@@ -962,13 +1011,7 @@ function renderReview(st) {
   const misfiled = r.decision === "NOT_INVOICE" && !r.review_status;
   const archived = r.archived_at ? `<div class="notice">Archived ${when(r.archived_at)}. It's off the working list but kept for audit, and it still counts when checking for repeat invoices. <button class="linkish" id="restore">Restore it</button></div>` : "";
   const notes = QUICK_NOTES[r.route_to] || [];
-  const vv = pending && r.trace?.decision?.vendor_to_verify;
-  const verifyCard = vv ? `<div class="card pad verify-card" style="margin-top:16px"><div class="vc-head"><span class="vc-ic">${icon.shield}</span>
-      <div><h3 style="margin:0">New vendor · verify once</h3><div class="muted small">NoCap has no vendor master. It learned this vendor from the invoice; check them once and they're trusted from then on.</div></div></div>
-      <dl class="kv small" id="vv-details"><dt>Vendor</dt><dd>Loading…</dd></dl>
-      <ul class="m-list small muted"><li>Look up the GSTIN on the GST portal: is it active, and does the legal name match?</li><li>Confirm the bank account with a cancelled cheque or a call to a contact you already know.</li></ul>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn ok" id="vv-ok">${icon.shield} Verify vendor &amp; re-check</button><button class="btn bad" id="vv-block">Block vendor</button></div></div>` : "";
-  el.innerHTML = archived + links + verifyCard + (misfiled ? `<div class="card pad" style="margin-top:16px"><h3>Is this actually an invoice?</h3>
+  el.innerHTML = archived + links + (misfiled ? `<div class="card pad" style="margin-top:16px"><h3>Is this actually an invoice?</h3>
       <p class="muted small" style="margin:0 0 12px">If the vendor is really asking to be paid, type the details from the document. It will be re-checked against every rule, like any invoice.</p>
       <button class="btn" id="fix">${icon.edit} Correct details &amp; re-check</button></div><div id="fix-form"></div>` : "") + (pending ? `<div class="card pad" style="margin-top:16px"><h3>Your decision · ${esc(friendly(r.route_to))}</h3><div class="review">
       <p class="muted small" style="margin:0 0 10px">${esc(TEAM_WHY[r.route_to] || "")}</p>
@@ -979,16 +1022,6 @@ function renderReview(st) {
         <span class="faint small" style="margin-left:auto">Recorded as <b>${esc(reviewer() || "AP Reviewer")}</b></span></div></div></div>
       <div id="fix-form"></div>` : "") + audit;
   if (misfiled) $("#fix").onclick = () => renderFixForm(st);
-  if (vv) {
-    api("/api/vendors").then(({ vendors }) => {
-      const v = vendors.find((x) => x.vendor_id === vv); if (!v || !$("#vv-details")) return;
-      $("#vv-details").innerHTML = `<dt>Vendor</dt><dd><b>${esc(v.name)}</b> <span class="faint mono">${esc(v.vendor_id)}</span></dd>
-        <dt>GSTIN</dt><dd class="mono">${esc(v.tax_id || "Not printed on the invoice")}</dd><dt>Bank</dt><dd>${esc(v.bank)}${v.ifsc ? ` · IFSC <span class="mono">${esc(v.ifsc)}</span>` : ""}</dd>
-        <dt>Email domain</dt><dd class="mono">${esc(v.email_domain || "—")}</dd><dt>Added</dt><dd>${when(v.created_at)} from this invoice</dd>`;
-    }).catch(() => {});
-    $("#vv-ok").onclick = () => { window.scrollTo({ top: 0, behavior: "smooth" }); verifyHere(); };
-    $("#vv-block").onclick = () => blockVendor(vv, () => router());
-  }
   $("#restore") && ($("#restore").onclick = async () => { try { st.run = await postJSON(`/api/runs/${r.id}/restore`, { actor: reviewer() }); toast("Restored"); renderReview(st); } catch (e) { toast(e.message, "error"); } });
   if (pending) {
     $$(".quick button", el).forEach((b) => (b.onclick = () => { $("#note").value = b.dataset.n; $("#note").focus(); }));

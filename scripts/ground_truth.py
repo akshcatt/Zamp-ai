@@ -19,14 +19,16 @@ def truth(spec: dict) -> dict:
     ifsc = re.search(r"IFSC\s+([A-Z]{4}0[A-Z0-9]{6})", notes)
     acct = re.search(r"A/c No\.\s+(\d{6,})", notes)
     total = next(amt(v) for l, v, b in spec["totals"] if b)
-    inv_no = meta.get("Invoice #") or meta.get("Bill Number") or meta.get("Invoice No.")
+    inv_no = meta.get("Invoice #") or meta.get("Bill Number") or meta.get("Invoice No.") or meta.get("Bill No.") or meta.get("Memo No.")
     po = meta.get("PO Number") or meta.get("Your Ref") or meta.get("Cust. PO")
-    email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", spec["vendor_address"] + " " + spec.get("vendor_contact", ""))
+    email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", spec.get("vendor_address", " ".join(spec.get("header_lines", []))) + " " + spec.get("vendor_contact", ""))
     change = next((n.lstrip("!") for n in spec.get("notes", []) if "changed banks" in n), None)
     return {
+        "bill_kind": spec.get("bill_kind", "tax_invoice"), "category": spec.get("category"), "already_paid": spec.get("already_paid", False),
+        "payment_method": None,
         "document_type": spec.get("doc_type", "invoice"), "vendor_name": spec["vendor_name"], "vendor_address": None, "vendor_tax_id": None,
         "vendor_email": email.group(0) if email else None, "vendor_phone": None, "bill_to_name": "Lumen Home Goods Pvt. Ltd.",
-        "invoice_number": inv_no, "invoice_date": parse(meta.get("Invoice Date") or meta.get("Date")), "due_date": None,
+        "invoice_number": inv_no, "invoice_date": parse(re.sub(r"\s+\d{1,2}:\d{2}$", "", meta.get("Invoice Date") or meta.get("Bill Date") or meta.get("Date") or "")), "due_date": parse(meta.get("Due Date")),
         "po_reference": po, "payment_terms": meta.get("Terms"), "currency": "INR",
         "line_items": [{"description": l["description"], "quantity": l["qty"], "unit_price": l["unit_price"],
                         "amount": round(l["qty"] * l["unit_price"], 2)} for l in spec["lines"]],

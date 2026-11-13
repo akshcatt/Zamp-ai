@@ -43,13 +43,17 @@ EXPECTED = {
     "happy_path": ("APPROVE", None), "edge_split_po_overrun": ("HOLD", "Procurement / Buyer"),
     "edge_scanned_inferred_po": ("APPROVE", None), "edge_disguised_duplicate": ("REJECT", "Rejected: duplicate"),
     "edge_bank_change_fraud": ("HOLD", "Treasury & Fraud"), "variant_within_tolerance": ("APPROVE", None),
-    "variant_missing_fields": ("REJECT", "Returned to vendor"), "variant_phone_photo": ("APPROVE", None),
+    "variant_missing_fields": ("APPROVE", None), "variant_phone_photo": ("APPROVE", None),
     "variant_not_an_invoice": ("NOT_INVOICE", "Filed: not an invoice"),
+    "bill_restaurant": ("APPROVE", "Recorded: already paid"), "bill_electricity": ("APPROVE", "Auto-approved → payment run"),
+    "bill_handwritten_memo": ("APPROVE", "Recorded: already paid"),
 }
 norm = lambda s: re.sub(r"[^A-Z0-9]", "", (s or "").upper())
 money_eq = lambda a, b: (a is None and b is None) or (a is not None and b is not None and abs(float(a) - float(b)) < 0.011)
 FIELDS = {
     "Document type": lambda g, t: g.get("document_type") == t["document_type"],
+    "Bill type": lambda g, t: g.get("bill_kind") == t["bill_kind"],
+    "Already paid?": lambda g, t: bool(g.get("already_paid")) == bool(t["already_paid"]),
     "Vendor name": lambda g, t: norm(t["vendor_name"])[:12] in norm(g.get("vendor_name")),
     "Invoice number": lambda g, t: norm(g.get("invoice_number")) == norm(t["invoice_number"]),
     "Invoice date": lambda g, t: g.get("invoice_date") == t["invoice_date"],
@@ -124,7 +128,7 @@ md = [f"# Extraction & decision benchmark\n",
       "| Field | Correct |", "| --- | --- |", *[f"| {f} | {h[0]}/{h[1]} |" for f, h in field_hits.items()], "",
       "| Sample | Fields | Decision | Expected | Misses |", "| --- | --- | --- | --- | --- |",
       *[f"| {r['sample']} | {r['fields_ok']}/{r['fields']} | {r['decision']} | {r['expected']} | {', '.join(r['misses']) or '—'} |" for r in rows], "",
-      "Caveat: 8 synthetic documents is a smoke-level benchmark, not a statistical claim. Real vendor invoices are messier;",
+      "Caveat: a dozen synthetic documents is a smoke-level benchmark, not a statistical claim. Real vendor invoices are messier;",
       "the next step is a labelled set of real (redacted) invoices from the customer.", ""]
 (ROOT / "docs" / "BENCHMARK.md").write_text("\n".join(md))
 print(f"\nFields {tot_ok}/{tot} ({result['field_accuracy']}%) · decisions {result['decisions_correct']}/{len(rows)} · wrote app/seed/benchmark.json and docs/BENCHMARK.md")

@@ -34,9 +34,15 @@ EXTRACTION_SCHEMA = {
         "bill_to_name", "invoice_number", "invoice_date", "due_date", "po_reference", "payment_terms",
         "currency", "line_items", "subtotal", "tax_amount", "tax_rate_pct", "shipping_amount", "discount_amount", "round_off", "total_amount",
         "tax_inclusive", "bank_details", "payment_instruction_notes", "field_confidence", "extraction_warnings",
+        "bill_kind", "category", "already_paid", "payment_method",
     ],
     "properties": {
         "document_type": {"type": "string", "enum": ["invoice", "credit_note", "quote", "statement", "purchase_order", "receipt", "other"]},
+        "bill_kind": {"type": "string", "enum": ['tax_invoice', 'utility_bill', 'restaurant_bill', 'retail_receipt', 'travel_receipt', 'online_order', 'handwritten_bill', 'other_bill'],
+                      "description": "What kind of bill this is. tax_invoice = a formal supplier/GST invoice to a business. Everything else is an everyday bill"},
+        "category": {"type": "string", "enum": ['office_supplies', 'pantry_and_housekeeping', 'furniture_and_equipment', 'it_and_software', 'professional_services', 'facilities_and_maintenance', 'utilities', 'telecom_and_internet', 'rent', 'meals_and_entertainment', 'travel_and_conveyance', 'fuel', 'logistics_and_courier', 'packaging_and_raw_materials', 'events', 'repairs_and_spares', 'medical', 'other'], "description": "What the money is for, judged from the items and the seller"},
+        "already_paid": {"type": "boolean", "description": "true if the bill shows it was already paid (paid by card/UPI/cash, 'PAID', receipt of payment); false if an amount is still due"},
+        "payment_method": {"type": ["string", "null"], "description": "How it was paid if shown: UPI, card, cash, net banking, wallet. Null if not paid or not shown"},
         "vendor_name": STR, "vendor_address": STR, "vendor_tax_id": STR, "vendor_email": STR, "vendor_phone": STR,
         "bill_to_name": STR,
         "invoice_number": STR,
@@ -80,6 +86,8 @@ EXTRACTION_SCHEMA = {
 
 SYSTEM = """You are the document-reading step of an accounts-payable pipeline. You transcribe what is printed on a vendor document into structured fields. You do not judge whether the invoice should be paid; downstream rules do that.
 
+You will be given ANY kind of bill, not only formal invoices: GST tax invoices, electricity/water/phone/internet bills, restaurant bills, shop and petrol-pump receipts, cab/hotel/flight receipts, online orders, and handwritten cash memos or kachcha bills. Read them all.
+
 Rules:
 - Transcribe exactly what is printed. Never infer or invent a value that is not on the page. If a field is absent, return null. Example: no PO number printed means po_reference = null, even if you can guess one.
 - These are Indian invoices. Amounts are in rupees (Rs., ₹ or INR) and use Indian digit grouping (12,34,567.50 = 1234567.50). Return numbers as plain decimals with no currency symbols or separators. currency is "INR" unless another currency is printed.
@@ -87,6 +95,10 @@ Rules:
 - GST: tax_amount is the total tax charged, i.e. CGST + SGST (or UTGST) added together, or IGST. tax_rate_pct is the combined rate (9% CGST + 9% SGST = 18). If the invoice says GST is payable under reverse charge (RCM) or "GST extra", no tax is charged on it: tax_amount = null.
 - discount_amount: a discount row in the totals block ("Less: Trade Discount @ 5%", "Discount", "Cash discount") as a POSITIVE number. subtotal stays the gross sum of the lines; GST is charged on subtotal minus discount. Payment-term discounts like "2/10 Net 30" are not a discount_amount.
 - round_off: many Indian invoices round the payable to the nearest rupee with a "Round Off" row (e.g. -0.40 or +0.30). Copy it with its sign; total_amount is the final rounded amount payable.
+- A bill is still a bill when it's a receipt or a cash memo: document_type = "invoice" for anything asking for or recording payment for goods or services (including receipts of payment). Use quote / statement / purchase_order / other only for documents that are not a bill at all.
+- invoice_number: the bill's own reference, whatever it's called: invoice no., bill no., receipt no., cash memo no., order ID, booking ID. For utility bills use the bill number (not the consumer/account number). Null if none.
+- vendor_name: the seller, shop, restaurant, utility company or operator.
+- bill_kind, category, already_paid and payment_method are your judgment from the document; set them for every bill.
 - vendor_tax_id is the vendor's GSTIN (15 characters, e.g. 29AAKCS3127M1Z6), not the buyer's.
 - line_items: one entry per printed line. amount is the printed line total.
 - shipping_amount is only for a shipping/freight row in the totals block (next to subtotal and tax). If freight is listed as a line item, it belongs in line_items only. Never count it twice.
@@ -271,9 +283,34 @@ def _find(patterns: list[str], text: str, flags=re.I) -> str | None:
     return None
 
 
+_KIND_HINTS = [("utility_bill", r"electricity|consumer\s*no|units\s*consumed|bescom|water\s*bill|broadband|postpaid|meter"),
+               ("restaurant_bill", r"restaurant|cafe|table\s*no|covers|food|kitchen|dine"),
+               ("handwritten_bill", r"cash\s*memo|kachcha|estimate\s*slip"),
+               ("travel_receipt", r"\btrip\b|\bcab\b|\bride\b|boarding|\bpnr\b|hotel|check-?in"),
+               ("online_order", r"order\s*id|order\s*#|shipped|delivered\s*to"),
+               ("tax_invoice", r"tax\s*invoice|gstin|purchase\s*order|\bpo\b")]
+_CATEGORY_HINTS = [("utilities", r"electricity|water\s*bill|bescom|units\s*consumed"), ("telecom_and_internet", r"broadband|internet|postpaid|mobile"),
+                   ("meals_and_entertainment", r"restaurant|cafe|food|meal|lunch|dinner|catering"), ("travel_and_conveyance", r"\btrip\b|\bcab\b|hotel|flight|train"),
+                   ("fuel", r"petrol|diesel|fuel"), ("logistics_and_courier", r"freight|courier|logistics|\blr\b"),
+                   ("pantry_and_housekeeping", r"coffee|tea|sugar|biscuit|tissue|housekeeping|cleaning|detergent|phenyl"),
+                   ("office_supplies", r"paper|toner|pen|stapler|file|stationery"), ("packaging_and_raw_materials", r"box|packaging|carton|tape"),
+                   ("professional_services", r"consult|professional|implementation|hours"), ("repairs_and_spares", r"bearing|hose|belt|spare|repair")]
+
+
+def _bill_profile(text: str) -> dict:
+    """Keyword guess at bill kind / category / paid status for the no-AI fallback."""
+    kind = next((k for k, rx in _KIND_HINTS if re.search(rx, text, re.I)), "other_bill")
+    cat = next((c for c, rx in _CATEGORY_HINTS if re.search(rx, text, re.I)), "other")
+    paid = bool(re.search(r"paid\s*(?:by|via|in)|payment\s*mode|amount\s*paid|\bpaid\b|received\s*with\s*thanks", text, re.I)) and \
+        not re.search(r"amount\s*(?:due|payable)|due\s*date|pay\s*by", text, re.I)
+    method = next((m for m, rx in (("UPI", r"\bupi\b|gpay|phonepe|paytm"), ("Card", r"\bcard\b|visa|mastercard|rupay"), ("Cash", r"\bcash\b"))
+                   if re.search(rx, text, re.I)), None) if paid else None
+    return {"bill_kind": kind, "category": cat, "already_paid": paid, "payment_method": method}
+
+
 def _doc_type(text: str) -> str:
     """Classify from the title words. Quote/statement wording wins only when the page never calls itself an invoice."""
-    if re.search(r"\binvoice\b|\bbill (?:no|number|#)", text, re.I):
+    if re.search(r"\binvoice\b|\bbill\s*(?:no|number|#)|\breceipt\b|cash\s*memo|amount\s*(?:paid|payable)|grand\s*total", text, re.I):
         return "invoice"
     if re.search(r"\bquot(?:e|ation)\b|\bestimate\b|\bproforma\b", text, re.I):
         return "quote"
@@ -290,7 +327,7 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
         raise ExtractionError("No text layer and no LLM available (scanned document needs vision/OCR)")
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     first = re.sub(r"\s+(?:(?:FREIGHT\s+|TAX\s+)?INVOICE|QUOTATION|QUOTE|ESTIMATE|STATEMENT(?:\s+OF\s+ACCOUNT)?)$", "", lines[0], flags=re.I) if lines else None
-    inv_no = _find([r"(?:Invoice\s*(?:#|No\.?|Number)|Bill\s*Number)\s*:?\s*([A-Z0-9][A-Z0-9\-/ ]{2,20}?)(?:\s{2,}|\s+(?:Invoice|Date|PO|Cust|Your|Terms|Period)\b|$)"], text, re.I | re.M)
+    inv_no = _find([r"(?:Invoice\s*(?:#|No\.?|Number)|Bill\s*(?:Number|No\.?)|Receipt\s*(?:No\.?|#)|(?:Cash\s*)?Memo\s*No\.?|Order\s*(?:ID|#))\s*:?\s*([A-Z0-9][A-Z0-9\-/ ]{2,20}?)(?:\s{2,}|\s+(?:Invoice|Date|PO|Cust|Your|Terms|Period)\b|$)"], text, re.I | re.M)
     if inv_no and not re.search(r"\d", inv_no):  # a column header ('DATE'), not a number
         inv_no = None
     if not inv_no:
@@ -332,7 +369,7 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
         if m:
             ro = _to_float(m.group(2)) * (-1 if m.group(1) and any(c in m.group(1) for c in "-−") else 1)
             break
-    total = (label_amount(r"^(?:total\s*due|amount\s*due|amount\s*payable|balance\s*due|total\s*\(?inr\)?|grand\s*total|net\s*payable)\b")
+    total = (label_amount(r"^(?:total\s*due|amount\s*due|amount\s*payable|net\s*amount\s*payable|balance\s*due|total\s*\(?inr\)?|grand\s*total|net\s*payable|amount\s*paid)\b")
              or label_amount(r"^total\b"))
     ifsc = _find([r"IFSC(?:\s*Code)?\s*:?\s*([A-Z]{4}0[A-Z0-9]{6})"], text)
     acct = _find([r"(?:A/c|Account|Acct)\.?\s*(?:No\.?)?\s*:?\s*(\d{6,18})"], text)
@@ -343,7 +380,7 @@ def extract_heuristic(text: str) -> tuple[dict, dict]:
     change_note = _find([r"((?:we have changed banks|new bank|updated bank|change of bank)[^\n]*)"], text)
     terms = _find([r"Terms\s*:?\s*((?:\d+/\d+\s+)?Net\s*\d+)"], text)
     data = {
-        "document_type": _doc_type(text),
+        "document_type": _doc_type(text), **_bill_profile(text),
         "vendor_name": first, "vendor_address": None, "vendor_tax_id": _find([r"GSTIN\s*:?\s*(\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]Z[0-9A-Z])"], text),
         "vendor_email": email, "vendor_phone": None, "bill_to_name": "Lumen Home Goods Pvt. Ltd." if "Lumen Home Goods" in text else None,
         "invoice_number": inv_no, "invoice_date": _to_date(date_raw), "due_date": None, "po_reference": po,

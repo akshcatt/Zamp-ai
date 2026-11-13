@@ -709,3 +709,16 @@ code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2)
 .fixed-note span { flex: 1; min-width: 200px; }
 .fixed-note.ok { background: var(--ok-soft); border-color: var(--ok-line); } .fixed-note.ok svg { color: var(--ok); }
 .fixed-note.partial { background: var(--warn-soft); border-color: var(--warn-line); } .fixed-note.partial svg { color: var(--warn); }
+.fb-d { margin-top: 4px; font-size: 12.5px; color: var(--ink-2); }
+.fb-d:empty { display: none; }
+/* reported issues (non-blocking) */
+.issues { margin: 14px 0 4px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.iss-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 11px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.iss { display: flex; gap: 12px; align-items: flex-start; padding: 11px 14px; border-top: 1px solid var(--line); cursor: pointer; }
+.iss:first-of-type { border-top: 0; }
+.iss input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--ok); flex: none; cursor: pointer; }
+.iss.done b { text-decoration: line-through; color: var(--ink-3); }
+.iss:hover { background: var(--surface-2); }
+.cat-chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-top: 4px; font-family: var(--sans); }
+.iss-chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); margin: 4px 0 0 6px; }
+.issues-attn { border: 1px solid var(--warn-line); cursor: pointer; font: inherit; }

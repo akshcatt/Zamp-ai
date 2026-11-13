@@ -191,7 +191,24 @@ def run(run_id: str):
     r = db.get_run(run_id)
     if not r:
         raise HTTPException(404)
+    r["ticks"] = db.ticks(run_id)
     return r
+
+
+class TickIn(BaseModel):
+    done: bool = True
+    actor: str = ""
+
+
+@app.post("/api/runs/{run_id}/issues/{check_id}")
+def tick_issue(run_id: str, check_id: str, body: TickIn, request: Request):
+    """Tick off (or un-tick) a reported issue on a bill. Reported issues never block payment; ticking records who looked."""
+    r = db.get_run(run_id)
+    if not r:
+        raise HTTPException(404)
+    if check_id not in {i["id"] for i in ((r.get("trace") or {}).get("decision") or {}).get("issues", [])}:
+        raise HTTPException(400, "That isn't a reported issue on this bill.")
+    return {"ticks": db.set_tick(run_id, check_id, body.done, actor_of(request, body.actor))}
 
 
 @app.get("/api/runs/{run_id}/file")
@@ -337,6 +354,8 @@ def stats():
         "pending_review": sum(queues.values()), "queues": queues, "filed": filed,
         "archived": len(db.list_runs(10000, archived=True)),
         **momentum(rs),
+        "open_issues": sum(max(0, (r.get("issues") or 0) - (r.get("issues_ticked") or 0)) for r in rs),
+        "bills_with_issues": sum(1 for r in rs if (r.get("issues") or 0) > (r.get("issues_ticked") or 0)),
     }
 
 
@@ -382,7 +401,11 @@ def analytics():
     rs = [r for r in db.runs_for_analytics() if is_invoice_run(r)]
     timeline, stage_ms, reasons, teams, vendors, readers = [], defaultdict(list), Counter(), defaultdict(Counter), defaultdict(lambda: [0, 0.0]), Counter()
     money = Counter()
+    categories = defaultdict(lambda: [0, 0.0])
     for r in rs:
+        cat = r.get("category") or "other"
+        categories[cat][0] += 1
+        categories[cat][1] += r["total"] or 0
         tr, total = r["trace"], r["total"] or 0
         protected = (r["decision"] == "REJECT" and (r["route_to"] or "").startswith("Rejected: duplicate")) or \
                     (r["decision"] == "HOLD" and r["route_to"] == "Treasury & Fraud")
@@ -417,6 +440,8 @@ def analytics():
         "money": {k: round(money.get(k, 0), 2) for k in ("APPROVE", "HOLD", "REJECT")},
         "vendors": sorted(({"vendor": v, "count": c, "total": round(s, 2)} for v, (c, s) in vendors.items()), key=lambda x: -x["total"])[:6],
         "readers": dict(readers),
+        "categories": sorted(({"category": c, "label": pipeline.category_name(c), "count": n, "total": round(t, 2)}
+                              for c, (n, t) in categories.items()), key=lambda x: -x["total"]),
         "reviews": {"count": len(turnaround), "avg_seconds": round(sum(turnaround) / len(turnaround)) if turnaround else None},
     }
 
@@ -461,7 +486,7 @@ EXPORT_COLS = [("Received (UTC)", "created_at"), ("Run ID", "id"), ("Vendor", "v
                ("Invoice #", "invoice_number"), ("PO", "po_number"), ("Amount", "total"), ("Currency", "currency"),
                ("Automated decision", "decision"), ("Routed to", "route_to"), ("Review", "review_status"),
                ("Reason", "headline"), ("Read by", "extractor"), ("Seconds", "duration_ms"), ("File", "filename"), ("Source", "source"),
-               ("Archived (UTC)", "archived_at")]
+               ("Archived (UTC)", "archived_at"), ("Category", "category"), ("Bill type", "bill_kind"), ("Reported issues", "issues")]
 
 
 def _export_rows():

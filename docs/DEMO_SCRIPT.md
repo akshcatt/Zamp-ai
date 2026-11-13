@@ -95,7 +95,7 @@ Order: Happy → Bank change → Scanned/no PO → Split billing → Disguised d
 - **Why route to different teams?**
   > Because the fix differs. A bank change needs Treasury and a callback; a PO overrun needs the buyer's change order; an unknown vendor needs onboarding. Sending everything to "AP" just moves the pile.
 - **What did you assume?**
-  > See DESIGN.md §5. INR; POs net of tax; 2%/₹40,000 tolerance; 3-way match for goods; missing invoice number means return to vendor.
+  > See DESIGN.md §5. INR; POs net of tax; 2%/₹40,000 tolerance; 3-way match for goods; missing invoice number is a reported issue (with a drafted email), not a block; only money risks hold a bill.
 - **What would you build next?**
   > Email intake, ERP connectors, credit-note matching, multi-currency/VAT, an eval set, and segregation of duties (DESIGN.md §7).
 - **How did you use AI to build this?**

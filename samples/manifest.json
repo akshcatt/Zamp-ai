@@ -65,7 +65,7 @@
     "kind": "Extra input",
     "title": "No invoice number, no date",
     "vendor": "Annapurna Caterers",
-    "what_to_expect": "Returned to the vendor. Without an invoice number the invoice can't be posted, checked for duplicates, or claimed for GST input credit. The process drafts the email to the vendor explaining exactly what's missing.",
+    "what_to_expect": "Approved, with an issue reported to tick off. The missing invoice number and date don't block payment; they're flagged, and an email asking the vendor for them is drafted (GST input credit needs both). Repeats are still caught by seller, date and amount.",
     "scanned": false,
     "photo": false
   },
@@ -88,5 +88,35 @@
     "what_to_expect": "Filed, not paid. A vendor sent a price quote to the AP inbox. It has prices and a total, but it isn't a bill, so there's nothing to pay and nothing wrong with the sender. It's filed for reference and kept out of the rejection numbers. If it ever turns out to be a real invoice, a reviewer can correct it and re-check.",
     "scanned": false,
     "photo": false
+  },
+  {
+    "file": "10_bill_restaurant_truffles_TCK-0457.pdf",
+    "id": "bill_restaurant",
+    "kind": "Everyday bill",
+    "title": "Restaurant bill: team lunch, paid by card",
+    "vendor": "Truffles Cafe & Kitchen",
+    "what_to_expect": "Not a formal invoice and already paid. NoCap reads it as a restaurant bill, files it under Meals & entertainment, learns Truffles as a new seller without asking for verification, checks the 5% GST and the round-off, and records it as already paid. No PO, no hold.",
+    "scanned": false,
+    "photo": false
+  },
+  {
+    "file": "11_bill_electricity_bescom_Nov-2026.pdf",
+    "id": "bill_electricity",
+    "kind": "Everyday bill",
+    "title": "Electricity bill: due later, no PO",
+    "vendor": "Bangalore Electricity Supply Company Ltd",
+    "what_to_expect": "A utility bill, not a supplier invoice. NoCap files it under Utilities, needs no purchase order or vendor verification, accepts the round-off, and schedules payment for the due date (20 Nov).",
+    "scanned": false,
+    "photo": false
+  },
+  {
+    "file": "12_bill_handwritten_cash_memo_lakshmi_412.jpg",
+    "id": "bill_handwritten_memo",
+    "kind": "Everyday bill",
+    "title": "Handwritten-style cash memo, phone photo",
+    "vendor": "Sri Lakshmi Provision Stores",
+    "what_to_expect": "A small shop's cash memo, photographed: no GSTIN, no PO, paid in cash. NoCap reads it from the photo, files it under Pantry & housekeeping, learns the shop as a new seller, and records it as already paid.",
+    "scanned": false,
+    "photo": true
   }
 ]

@@ -1,78 +1,88 @@
 {
   "run_on": "2026-11-13",
   "model": "gemini-3.1-flash-lite",
-  "samples": 9,
-  "field_accuracy": 100.0,
-  "fields_correct": 105,
-  "fields_total": 105,
+  "samples": 12,
+  "field_accuracy": 99.4,
+  "fields_correct": 165,
+  "fields_total": 166,
   "decision_accuracy": 100.0,
-  "decisions_correct": 9,
-  "median_read_seconds": 9.7,
+  "decisions_correct": 12,
+  "median_read_seconds": 3.1,
   "by_field": [
     {
       "field": "Document type",
-      "correct": 9,
-      "total": 9
+      "correct": 12,
+      "total": 12
+    },
+    {
+      "field": "Bill type",
+      "correct": 10,
+      "total": 11
+    },
+    {
+      "field": "Already paid?",
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Vendor name",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Invoice number",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Invoice date",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "PO reference",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Subtotal",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Tax",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Shipping",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Discount",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Round off",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Total",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Line items (count & amounts)",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     },
     {
       "field": "Remit-to account",
-      "correct": 8,
-      "total": 8
+      "correct": 11,
+      "total": 11
     }
   ],
   "rows": [
@@ -83,13 +93,13 @@
       "route": "Auto-approved \u2192 payment run",
       "expected": "APPROVE",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 14272,
-      "seconds": 15.0
+      "read_ms": 2786,
+      "seconds": 3.5
     },
     {
       "sample": "02_edge_split_billing_kaveri_KCS-INV-1209.pdf",
@@ -98,13 +108,13 @@
       "route": "Procurement / Buyer",
       "expected": "HOLD",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 4121,
-      "seconds": 4.3
+      "read_ms": 3270,
+      "seconds": 3.5
     },
     {
       "sample": "03_edge_scanned_no_po_ganga_GFC-30871.pdf",
@@ -113,13 +123,13 @@
       "route": "Auto-approved \u2192 payment run",
       "expected": "APPROVE",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
-      "model": "gemini-3.5-flash-lite",
-      "read_ms": 10152,
-      "seconds": 10.2
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3116,
+      "seconds": 3.3
     },
     {
       "sample": "04_edge_disguised_duplicate_meenakshi_INV-2026-0417.pdf",
@@ -128,13 +138,13 @@
       "route": "Rejected: duplicate",
       "expected": "REJECT",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 10771,
-      "seconds": 10.8
+      "read_ms": 2597,
+      "seconds": 2.9
     },
     {
       "sample": "05_edge_bank_change_kesari_KFS-2026-1147.pdf",
@@ -143,13 +153,13 @@
       "route": "Treasury & Fraud",
       "expected": "HOLD",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.5-flash-lite",
-      "read_ms": 4909,
-      "seconds": 5.1
+      "read_ms": 33985,
+      "seconds": 34.1
     },
     {
       "sample": "06_variant_tolerance_pragati_PPP-7734.pdf",
@@ -158,28 +168,28 @@
       "route": "Auto-approved \u2192 payment run",
       "expected": "APPROVE",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 5739,
-      "seconds": 5.9
+      "read_ms": 4221,
+      "seconds": 4.3
     },
     {
       "sample": "07_variant_missing_fields_annapurna.pdf",
       "kind": "Extra input",
-      "decision": "REJECT",
-      "route": "Returned to vendor",
-      "expected": "REJECT",
+      "decision": "APPROVE",
+      "route": "Auto-approved \u2192 payment run",
+      "expected": "APPROVE",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
-      "model": "gemini-3.5-flash-lite",
-      "read_ms": 31967,
-      "seconds": 32.1
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 2328,
+      "seconds": 2.5
     },
     {
       "sample": "08_variant_phone_photo_sahyadri_SOS-58377.jpg",
@@ -188,13 +198,13 @@
       "route": "Auto-approved \u2192 payment run",
       "expected": "APPROVE",
       "decision_ok": true,
-      "fields_ok": 13,
-      "fields": 13,
+      "fields_ok": 15,
+      "fields": 15,
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 9745,
-      "seconds": 10.0
+      "read_ms": 3499,
+      "seconds": 3.7
     },
     {
       "sample": "09_variant_quote_pragati_Q-2291.pdf",
@@ -208,8 +218,55 @@
       "misses": [],
       "extractor": "gemini",
       "model": "gemini-3.1-flash-lite",
-      "read_ms": 9545,
-      "seconds": 9.6
+      "read_ms": 2580,
+      "seconds": 2.7
+    },
+    {
+      "sample": "10_bill_restaurant_truffles_TCK-0457.pdf",
+      "kind": "Everyday bill",
+      "decision": "APPROVE",
+      "route": "Recorded: already paid",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 15,
+      "fields": 15,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3144,
+      "seconds": 3.3
+    },
+    {
+      "sample": "11_bill_electricity_bescom_Nov-2026.pdf",
+      "kind": "Everyday bill",
+      "decision": "APPROVE",
+      "route": "Auto-approved \u2192 payment run",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 15,
+      "fields": 15,
+      "misses": [],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 2499,
+      "seconds": 2.7
+    },
+    {
+      "sample": "12_bill_handwritten_cash_memo_lakshmi_412.jpg",
+      "kind": "Everyday bill",
+      "decision": "APPROVE",
+      "route": "Recorded: already paid",
+      "expected": "APPROVE",
+      "decision_ok": true,
+      "fields_ok": 14,
+      "fields": 15,
+      "misses": [
+        "Bill type"
+      ],
+      "extractor": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "read_ms": 3291,
+      "seconds": 3.5
     }
   ]
 }

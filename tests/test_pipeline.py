@@ -37,9 +37,12 @@ EXPECTED = {
     "edge_disguised_duplicate": ("REJECT", "Rejected: duplicate"),
     "edge_bank_change_fraud": ("HOLD", "Treasury & Fraud"),
     "variant_within_tolerance": ("APPROVE", None),
-    "variant_missing_fields": ("REJECT", "Returned to vendor"),
+    "variant_missing_fields": ("APPROVE", None),  # lenient: missing number/date is reported, not blocking
     "variant_phone_photo": ("APPROVE", None),
     "variant_not_an_invoice": ("NOT_INVOICE", "Filed: not an invoice"),
+    "bill_restaurant": ("APPROVE", "Recorded: already paid"),
+    "bill_electricity": ("APPROVE", "Auto-approved → payment run"),
+    "bill_handwritten_memo": ("APPROVE", "Recorded: already paid"),
 }
 
 
@@ -121,7 +124,7 @@ def test_tolerance_policy_change_flips_decision(env, monkeypatch):
 
 
 HEURISTIC_OK = ["happy_path", "edge_split_po_overrun", "edge_disguised_duplicate", "edge_bank_change_fraud",
-                "variant_within_tolerance", "variant_missing_fields", "variant_not_an_invoice"]
+                "variant_within_tolerance", "variant_missing_fields", "variant_not_an_invoice", "bill_restaurant", "bill_electricity"]
 
 
 @pytest.mark.parametrize("sid", HEURISTIC_OK)
@@ -324,3 +327,45 @@ def test_missing_bank_details_are_not_an_issue(env, monkeypatch):
     assert r["decision"] == "APPROVE", r["headline"]
     assert _check(r, "val.confidence")["status"] == "pass"
     assert "That's fine" in _check(r, "ven.bank")["detail"]
+
+
+
+def test_everyday_bills_are_categorised_recorded_and_never_held(env, monkeypatch):
+    r = _truth_run(env, monkeypatch, "bill_restaurant")
+    d = r["trace"]["decision"]
+    assert r["decision"] == "APPROVE" and d["category"] == "meals_and_entertainment" and d["already_paid"]
+    assert d["payment"]["terms"] == "Already paid" and d["payment"]["gl_coding"][0]["account"].startswith("6710")
+    assert _check(r, "ven.match")["status"] == "info"  # new seller learned, no verification hold
+    assert _check(r, "po.identify")["status"] == "info"  # no PO needed
+
+
+def test_utility_bill_is_paid_on_its_due_date(env, monkeypatch):
+    r = _truth_run(env, monkeypatch, "bill_electricity")
+    p = r["trace"]["decision"]["payment"]
+    assert r["decision"] == "APPROVE" and p["pay_on"] == "2026-11-20" and p["gl_coding"][0]["account"].startswith("6200")
+
+
+def test_non_money_problems_are_reported_not_held(env, monkeypatch):
+    """Lenient: missing invoice number, bill-to mismatch and low confidence are reported issues, not holds."""
+    def messy(t):
+        t["invoice_number"] = None
+        t["bill_to_name"] = "Some Other Company"
+        t["field_confidence"]["vendor_name"] = 0.3
+    r = _truth_run(env, monkeypatch, "variant_phone_photo", messy)
+    d = r["trace"]["decision"]
+    assert r["decision"] == "APPROVE", r["headline"]
+    assert {"val.required", "val.billto", "val.confidence"} <= {i["id"] for i in d["issues"]}
+    assert "issues reported to tick off" in r["headline"]
+
+
+def test_money_problems_still_block(env, monkeypatch):
+    """Lenient never means paying more than we should: an overrun or a bank swap still stops the bill."""
+    assert _truth_run(env, monkeypatch, "edge_split_po_overrun")["decision"] == "HOLD"
+    assert _truth_run(env, monkeypatch, "edge_bank_change_fraud")["route_to"] == "Treasury & Fraud"
+
+
+def test_repeat_bill_without_a_number_is_caught(env, monkeypatch):
+    first = _truth_run(env, monkeypatch, "bill_handwritten_memo", lambda t: t.update(invoice_number=None))
+    assert first["decision"] == "APPROVE"
+    again = _truth_run(env, monkeypatch, "bill_handwritten_memo", lambda t: t.update(invoice_number=None))
+    assert again["decision"] == "REJECT" and "same seller, date and amount" in again["headline"] + str(again["trace"])

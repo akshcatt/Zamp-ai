@@ -243,13 +243,14 @@ def test_autoload_replays_samples_from_stored_reads(monkeypatch):
     """A fresh empty deployment reloads the samples with no AI calls, and decisions match the real reads."""
     c, db, pl = make_client(monkeypatch)
     from app import demo
-    assert demo.autoload_samples(wait=True) == 9
+    assert demo.autoload_samples(wait=True) == 12
     runs = db.list_runs(archived=None)
-    assert len(runs) == 9 and all(r["status"] == "done" for r in runs)
+    assert len(runs) == 12 and all(r["status"] == "done" for r in runs)
     assert all(r["extractor"] == "gemini (cached)" for r in runs)
     by_file = {r["filename"][:2]: r["decision"] for r in runs}
     assert by_file == {"01": "APPROVE", "02": "HOLD", "03": "APPROVE", "04": "REJECT", "05": "HOLD",
-                       "06": "APPROVE", "07": "REJECT", "08": "APPROVE", "09": "NOT_INVOICE"}
+                       "06": "APPROVE", "07": "APPROVE", "08": "APPROVE", "09": "NOT_INVOICE",
+                       "10": "APPROVE", "11": "APPROVE", "12": "APPROVE"}
     assert demo.autoload_samples(wait=True) == 0  # never touches a database that already has data
 
 
@@ -282,3 +283,17 @@ def test_block_and_unblock_vendor(monkeypatch):
     assert r["decision"] == "REJECT" and r["route_to"] == "Rejected: blocked vendor"
     c.post(f"/api/vendors/{pragati['vendor_id']}/unblock", json={})
     assert next(v for v in c.get("/api/vendors").json()["vendors"] if v["name"].startswith("Pragati"))["status"] == "active"
+
+
+
+def test_tick_off_reported_issues(monkeypatch):
+    c, db, pl = make_client(monkeypatch)
+    r = run_sample(c, "variant_missing_fields")
+    assert r["decision"] == "APPROVE"
+    issues = r["trace"]["decision"]["issues"]
+    assert issues and c.get("/api/stats").json()["open_issues"] == len(issues)
+    out = c.post(f"/api/runs/{r['id']}/issues/{issues[0]['id']}", json={"done": True, "actor": "Priya"}).json()
+    assert out["ticks"][issues[0]["id"]]["actor"] == "Priya"
+    assert c.get("/api/stats").json()["open_issues"] == len(issues) - 1
+    assert c.post(f"/api/runs/{r['id']}/issues/not.a.check", json={"done": True}).status_code == 400
+    assert c.get(f"/api/runs/{r['id']}").json()["ticks"]

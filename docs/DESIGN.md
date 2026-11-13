@@ -28,7 +28,7 @@ So the build optimises for two things:
 | 1 | Intake | File bytes → file type + SHA-256 fingerprint | Type detected from the bytes, not the extension. Photo (JPG/PNG/WEBP/HEIC) → auto-rotate, convert to a one-page PDF. Anything else → reject |
 | 2 | Document analysis | PDF → text layer + page stats | Scanned (no text) → vision path, grounding check off |
 | 3 | AI extraction | PDF → strict-schema JSON + per-field confidence | API down → cached extraction → heuristic parser → manual keying |
-| 4 | Validation | Fields → checks | Missing invoice #/date → return to vendor; math/tax/date/confidence/grounding issue → AP |
+| 4 | Validation | Fields → checks | Money that doesn't add up (beyond rounding) → AP; no readable amount → AP; missing number/date, tax slab, dates, confidence, grounding → reported issues (non-blocking) |
 | 5 | Vendor verification | Fields + learned vendor list → matched vendor | New vendor → added as unverified from this invoice, held once for Vendor Mgmt; blocked → reject; bank/domain/change-notice → Treasury & Fraud |
 | 6 | Duplicate detection | Fields + ledger + queue → checks | Same normalised # and amount → reject; same # with a different amount, or same amount near the same date → AP |
 | 7 | PO & receipt matching | Fields + POs + receipts + ledger → match | PO quoted or inferred; price/qty variance vs tolerance; goods received; cumulative vs PO cap; controller threshold |
@@ -68,7 +68,7 @@ I picked edge cases that test **judgment and context**, not parsing tricks:
 
    The output is a hold for Treasury, an internal task to **call back on the phone number on file**, and an explicit "do not reply to the invoice's email". Payments only ever go to the verified account on file-file account. That's a control, not a check.
 
-Three extra inputs show the "close but not exact", "communicate back" and "it isn't even a PDF" behaviours. Pragati has ₹3,600 of freight within tolerance, so it's approved with a note. Annapurna has no invoice number or date, so it's returned to the vendor with a drafted email. The Sahyadri phone photo (a JPEG of a printed invoice, tilted on a desk) is normalised to a PDF at intake, so every later stage sees one input type, and it's read like a scan.
+Three extra inputs show the "close but not exact", "communicate back" and "it isn't even a PDF" behaviours. Pragati has ₹3,600 of freight within tolerance, so it's approved with a note. Annapurna has no invoice number or date: it's approved with an issue to tick off and a drafted email asking the vendor for them. The Sahyadri phone photo (a JPEG of a printed invoice, tilted on a desk) is normalised to a PDF at intake, so every later stage sees one input type, and it's read like a scan.
 
 ## 5. Assumptions (stated, so they can be challenged)
 
@@ -78,7 +78,7 @@ Three extra inputs show the "close but not exact", "communicate back" and "it is
 - **Goods POs need a receipt (3-way); service POs don't (2-way).**
 - **Inferred POs** can be auto-accepted at ≥ 0.85 confidence with a ≥ 0.15 margin. Many companies run "no PO, no pay"; that's one toggle on the Rules page.
 - **Controller sign-off** above ₹25 lakh, even when everything matches.
-- **Missing invoice number or date → return to vendor**, not "AP fixes it". Without them you can't post or dedupe, and the payment clock should start from a valid invoice.
+- **Missing invoice number or date → reported, not blocking.** The bill is still checked for repeats by seller, date and amount; for a formal GST invoice an email asking for the missing details is drafted, since input credit needs them.
 - **Demo date is pinned** (`AP_TODAY=2026-11-12`) so the sample dates and discount windows stay meaningful. Remove it in real use.
 - **Line-level quantity history isn't tracked.** Receipts are compared against this invoice's quantities. Cumulative control works on amounts.
 
@@ -114,3 +114,9 @@ There is no vendor master to load or maintain. Vendors are learned:
 - A discount row in the totals ("Less: Trade Discount @ 5%") is read as `discount_amount`; totals must reconcile as subtotal − discount + GST + shipping, the GST slab is checked on the discounted value, and a PO match notes that the lines match before the discount.
 - Indian invoices round the payable to the nearest rupee. A gap of up to ₹1 explained by a Round Off row (or a whole-rupee total) is shown as a round-off.
 - **Small differences are never a threat.** Any amount gap up to the smaller of `small_difference_max` (₹10) and `small_difference_pct` (2%) of the amount being compared passes with a note (both editable on the Rules page; on large amounts that's ₹10, below ₹500 it's 2%), everywhere amounts are compared: line maths, lines vs subtotal, the invoice total, price vs PO (including after a discount), cumulative PO billing, and repeat-invoice amount matching. Larger gaps are checked by the normal rules (the PO price tolerance is still 2% / ₹40,000).
+
+## Any bill, and a lenient default
+
+NoCap accepts every kind of bill: GST tax invoices, utility bills, restaurant and shop receipts, travel receipts, online orders and handwritten cash memos. The reader also returns `bill_kind`, `category` and `already_paid`. Everyday bills (anything that isn't a formal tax invoice, or anything already paid) need no purchase order and no vendor verification; they're booked to the category's ledger account, and already-paid bills are recorded rather than scheduled.
+
+Only money risks block a bill (duplicates, bank-change and look-alike-domain fraud, blocked vendors, no readable amount, amounts beyond the rounding limit, PO price or cumulative overruns, goods not received, high-value sign-off, and the one-time check of a new bank-paid supplier). Every other finding is a **reported issue**: shown on the bill with a tick box, counted on the Overview, never a hold.

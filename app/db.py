@@ -87,7 +87,9 @@ def _schema() -> list[str]:
           sha256 TEXT, status TEXT, decision TEXT, route_to TEXT, headline TEXT,
           vendor_id TEXT, vendor_name TEXT, invoice_number TEXT, total DOUBLE PRECISION, currency TEXT,
           po_number TEXT, duration_ms BIGINT, extractor TEXT, review_status TEXT,
-          trace_json TEXT, events_json TEXT, archived_at TEXT)""",
+          trace_json TEXT, events_json TEXT, archived_at TEXT, category TEXT, bill_kind TEXT, issues INTEGER)""",
+        # a reviewer ticks off each reported issue on a bill (who, when)
+        "CREATE TABLE IF NOT EXISTS issue_ticks (run_id TEXT, check_id TEXT, actor TEXT, ts TEXT, PRIMARY KEY (run_id, check_id))",
         f"""CREATE TABLE IF NOT EXISTS ledger (
           id {pk}, vendor_id TEXT, invoice_number TEXT, invoice_number_norm TEXT,
           invoice_date TEXT, net_amount DOUBLE PRECISION, total_amount DOUBLE PRECISION, po_number TEXT, status TEXT,
@@ -115,13 +117,15 @@ def master() -> dict:
 def init(reset: bool = False) -> None:
     with _lock:
         if reset:
-            for t in ("runs", "ledger", "audit", "policy", "files", "vendors"):
+            for t in ("runs", "ledger", "audit", "policy", "files", "vendors", "issue_ticks"):
                 q(f"DROP TABLE IF EXISTS {t}")
         for stmt in _schema():
             q(stmt)
         # additive migration for databases created before archiving existed
-        if "archived_at" not in {c["name"] for c in q("PRAGMA table_info(runs)", fetch="all")}:
-            q("ALTER TABLE runs ADD COLUMN archived_at TEXT")
+        cols = {c["name"] for c in q("PRAGMA table_info(runs)", fetch="all")}
+        for col, typ in (("archived_at", "TEXT"), ("category", "TEXT"), ("bill_kind", "TEXT"), ("issues", "INTEGER")):
+            if col not in cols:
+                q(f"ALTER TABLE runs ADD COLUMN {col} {typ}")
         seed = master()
         if q("SELECT COUNT(*) AS n FROM vendors", fetch="one")["n"] == 0:
             for e in seed["payment_history"]:  # anyone we've already paid is a known, verified vendor
@@ -164,7 +168,7 @@ def vendor_get(vendor_id: str) -> dict | None:
     return _vendor(q("SELECT * FROM vendors WHERE vendor_id = ?", (vendor_id,), fetch="one"))
 
 
-def vendor_add_from_invoice(inv: dict, run_id: str) -> dict:
+def vendor_add_from_invoice(inv: dict, run_id: str, status: str = "unverified", source: str = "first invoice") -> dict:
     """First invoice from someone new: add them as 'unverified' using what the invoice says. The details become the
     reference for later invoices, but nothing is paid until a person verifies the vendor once."""
     gstin = re.sub(r"\s", "", (inv.get("vendor_tax_id") or "")).upper() or None
@@ -185,8 +189,8 @@ def vendor_add_from_invoice(inv: dict, run_id: str) -> dict:
           " payment_terms, status, source, first_run_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
           (vid, name, "[]", gstin, email.split("@")[-1].lower() if "@" in email else None, inv.get("vendor_phone"),
            bank.get("bank_name"), (bank.get("ifsc") or "").upper() or None, bank.get("account_number"),
-           inv.get("payment_terms"), "unverified", "first invoice", run_id, now_iso()))
-        add_audit(run_id, "system", "vendor_added", f"New vendor {vid} {name} added from this invoice, unverified.")
+           inv.get("payment_terms"), status, source, run_id, now_iso()))
+        add_audit(run_id, "system", "vendor_added", f"New vendor {vid} {name} added from this bill ({status}).")
         return vendor_get(vid)
 
 
@@ -205,6 +209,20 @@ def vendor_set_status(vendor_id: str, status: str, actor: str, reason: str = "")
         add_audit(v["first_run_id"], actor, {"active": "vendor_verified" if v["status"] == "unverified" else "vendor_unblocked",
                                               "blocked": "vendor_blocked"}[status], f"{vendor_id} {v['legal_name']}: {reason or status}")
     return vendor_get(vendor_id)
+
+
+def ticks(run_id: str) -> dict:
+    return {r["check_id"]: {"actor": r["actor"], "ts": r["ts"]} for r in q("SELECT * FROM issue_ticks WHERE run_id = ?", (run_id,), fetch="all")}
+
+
+def set_tick(run_id: str, check_id: str, done: bool, actor: str) -> dict:
+    if done:
+        q("INSERT INTO issue_ticks (run_id, check_id, actor, ts) VALUES (?,?,?,?) ON CONFLICT (run_id, check_id) DO UPDATE SET actor = excluded.actor, ts = excluded.ts",
+          (run_id, check_id, actor, now_iso()))
+    else:
+        q("DELETE FROM issue_ticks WHERE run_id = ? AND check_id = ?", (run_id, check_id))
+    add_audit(run_id, actor, "issue_ticked" if done else "issue_unticked", check_id)
+    return ticks(run_id)
 
 
 def ping() -> bool:
@@ -291,7 +309,8 @@ def list_runs(limit: int = 200, archived: bool | None = False) -> list[dict]:
     """archived=False: the working list (default). True: only archived. None: everything (exports, vendor history)."""
     where = {False: "WHERE archived_at IS NULL", True: "WHERE archived_at IS NOT NULL", None: ""}[archived]
     return q("SELECT id, created_at, finished_at, filename, source, status, decision, route_to, headline, vendor_id, vendor_name,"
-             f" invoice_number, total, currency, po_number, duration_ms, extractor, review_status, archived_at FROM runs {where}"
+             f" invoice_number, total, currency, po_number, duration_ms, extractor, review_status, archived_at, category, bill_kind, issues,"
+             f" (SELECT COUNT(*) FROM issue_ticks t WHERE t.run_id = runs.id) AS issues_ticked FROM runs {where}"
              " ORDER BY created_at DESC, id DESC LIMIT ?", (limit,), fetch="all")
 
 
@@ -332,7 +351,7 @@ def open_runs_for_vendor(vendor_id: str, exclude: str) -> list[dict]:
 def runs_for_analytics(limit: int = 5000, include_archived: bool = False) -> list[dict]:
     extra = "" if include_archived else " AND archived_at IS NULL"
     rows = q("SELECT id, created_at, finished_at, decision, review_status, route_to, total, vendor_name, duration_ms,"
-             f" extractor, trace_json FROM runs WHERE status != 'running'{extra} ORDER BY created_at, id LIMIT ?", (limit,), fetch="all")
+             f" extractor, category, bill_kind, issues, trace_json FROM runs WHERE status != 'running'{extra} ORDER BY created_at, id LIMIT ?", (limit,), fetch="all")
     for r in rows:
         r["trace"] = json.loads(r.pop("trace_json") or "{}")
     return rows

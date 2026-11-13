@@ -206,7 +206,64 @@ def _table(c, s, y, header_fill, font="Helvetica", bold="Helvetica-Bold", size=1
     c.setFillColor(colors.black)
 
 
-LAYOUTS = {"modern": layout_modern, "classic": layout_classic, "industrial": layout_industrial}
+def layout_receipt(c: canvas.Canvas, s: dict) -> None:
+    """Till / thermal-printer receipt or a shop's cash memo: a narrow centred column, monospace."""
+    W, H = LETTER
+    memo = s.get("memo", False)
+    font, bold = ("Courier-Oblique", "Courier-BoldOblique") if memo else ("Courier", "Courier-Bold")
+    left, right = W / 2 - 1.9 * inch, W / 2 + 1.9 * inch
+    if memo:  # ruled memo paper
+        c.setStrokeColor(colors.HexColor("#9DB7D5"))
+        c.setLineWidth(0.4)
+        for i in range(36):
+            c.line(left - 10, H - 1.6 * inch - i * 16, right + 10, H - 1.6 * inch - i * 16)
+        c.setStrokeColor(colors.black)
+    y = H - 0.8 * inch
+    c.setFont(bold, 13)
+    c.drawCentredString(W / 2, y, s["vendor_name"])
+    c.setFont(font, 8.5)
+    for line in s.get("header_lines", []):
+        y -= 12
+        c.drawCentredString(W / 2, y, line)
+    y -= 20
+    c.setFont(bold, 10.5)
+    c.drawCentredString(W / 2, y, s.get("doc_title", "BILL"))
+    c.setFont(font, 9)
+    for label, value in s["meta"]:
+        y -= 13
+        c.drawString(left, y, f"{label}: {value}")
+    y -= 10
+    c.drawString(left, y, "-" * 52)
+    y -= 13
+    c.setFont(bold, 9)
+    c.drawString(left, y, "Item")
+    c.drawRightString(right - 1.55 * inch, y, "Qty")
+    c.drawRightString(right - 0.85 * inch, y, "Rate")
+    c.drawRightString(right, y, "Amount")
+    c.setFont(font, 9)
+    for ln in s["lines"]:
+        y -= 13
+        c.drawString(left, y, ln["description"][:24])
+        q = ln["qty"]
+        c.drawRightString(right - 1.55 * inch, y, f"{q:g}")
+        c.drawRightString(right - 0.85 * inch, y, inr(ln["unit_price"]))
+        c.drawRightString(right, y, inr(round(ln["qty"] * ln["unit_price"], 2)))
+    y -= 10
+    c.drawString(left, y, "-" * 52)
+    for label, value, is_bold in s["totals"]:
+        y -= 14
+        c.setFont(bold if is_bold else font, 10 if is_bold else 9)
+        c.drawString(left, y, label)
+        c.drawRightString(right, y, value)
+    c.setFont(font, 9)
+    y -= 8
+    c.drawString(left, y, "-" * 52)
+    for note in s.get("notes", []):
+        y -= 13
+        c.drawCentredString(W / 2, y, note)
+
+
+LAYOUTS = {"modern": layout_modern, "classic": layout_classic, "industrial": layout_industrial, "receipt": layout_receipt}
 
 
 def render(spec: dict) -> bytes:
@@ -439,7 +496,7 @@ SAMPLES = [
         "id": "variant_missing_fields",
         "kind": "Extra input",
         "title": "No invoice number, no date",
-        "what_to_expect": "Returned to the vendor. Without an invoice number the invoice can't be posted, checked for duplicates, or claimed for GST input credit. The process drafts the email to the vendor explaining exactly what's missing.",
+        "what_to_expect": "Approved, with an issue reported to tick off. The missing invoice number and date don't block payment; they're flagged, and an email asking the vendor for them is drafted (GST input credit needs both). Repeats are still caught by seller, date and amount.",
         "layout": "modern", "accent": "#B54708",
         "vendor_name": "Annapurna Caterers",
         "vendor_address": "45, 100 Feet Road, Indiranagar, Bengaluru 560038  ·  hello@annapurnacaterers.in  ·  GSTIN 29AQRPA4471H1Z5",
@@ -489,6 +546,74 @@ SAMPLES = [
         "notes": ["This is a quotation, not a request for payment. Prices are valid for 30 days.",
                   "To accept, please issue a purchase order referencing Q-2291."],
         "footer": "This is a computer-generated quotation. Prices are exclusive of GST.",
+    },
+    {
+        "file": "10_bill_restaurant_truffles_TCK-0457.pdf",
+        "id": "bill_restaurant",
+        "kind": "Everyday bill",
+        "bill_kind": "restaurant_bill", "category": "meals_and_entertainment", "already_paid": True,
+        "title": "Restaurant bill: team lunch, paid by card",
+        "what_to_expect": "Not a formal invoice and already paid. NoCap reads it as a restaurant bill, files it under Meals & entertainment, learns Truffles as a new seller without asking for verification, checks the 5% GST and the round-off, and records it as already paid. No PO, no hold.",
+        "layout": "receipt",
+        "vendor_name": "Truffles Cafe & Kitchen",
+        "header_lines": ["22, 1st Main, Koramangala 5th Block, Bengaluru 560095", "GSTIN 29AABFT6612K1Z8  ·  Ph 080 4110 2233"],
+        "doc_title": "TAX INVOICE / BILL",
+        "meta": [("Bill No.", "TCK/2611/0457"), ("Date", "12/11/2026 13:42"), ("Table", "14 (6 covers)")],
+        "lines": [
+            {"description": "Veg Burger", "qty": 4, "unit_price": 285.00},
+            {"description": "Chicken Wings", "qty": 2, "unit_price": 395.00},
+            {"description": "Fresh Lime Soda", "qty": 6, "unit_price": 120.00},
+            {"description": "Sizzling Brownie", "qty": 3, "unit_price": 220.00},
+        ],
+        "totals": totals(3310.00, "intra", rate=5, round_off=True, label_total="Grand Total"),
+        "notes": ["Paid by: CARD (VISA xxxx 4417)", "Thank you! Visit again"],
+    },
+    {
+        "file": "11_bill_electricity_bescom_Nov-2026.pdf",
+        "id": "bill_electricity",
+        "kind": "Everyday bill",
+        "bill_kind": "utility_bill", "category": "utilities", "already_paid": False,
+        "title": "Electricity bill: due later, no PO",
+        "what_to_expect": "A utility bill, not a supplier invoice. NoCap files it under Utilities, needs no purchase order or vendor verification, accepts the round-off, and schedules payment for the due date (20 Nov).",
+        "layout": "classic",
+        "vendor_name": "Bangalore Electricity Supply Company Ltd",
+        "vendor_address": "BESCOM, K.R. Circle, Bengaluru 560001  ·  Helpline 1912",
+        "vendor_contact": "Sub-division: Marathahalli (E5)  ·  Tariff: LT-3 Commercial",
+        "doc_title": "ELECTRICITY BILL",
+        "meta": [("Bill No.", "2026110489213"), ("Bill Date", "05/11/2026"), ("Account ID", "7412093856"),
+                 ("Billing Period", "01/10/2026 - 31/10/2026"), ("Units Consumed", "1,840 kWh"), ("Due Date", "20/11/2026")],
+        "col_desc": "Charges", "col_qty": "Units", "col_unit": "Rate (Rs.)",
+        "lines": [
+            {"description": "Fixed charges (25 kW)", "qty": 25, "unit_price": 110.00},
+            {"description": "Energy charges", "qty": 1840, "unit_price": 7.15},
+            {"description": "Fuel cost adjustment (FPPCA)", "qty": 1840, "unit_price": 0.32},
+            {"description": "Electricity tax @ 9% on energy", "qty": 1, "unit_price": 1184.04},
+        ],
+        "totals": totals(17678.84, round_off=True, label_total="Net Amount Payable"),
+        "notes": ["Pay online at bescom.co.in or any BBPS app before the due date to avoid disconnection.",
+                  "A delayed payment surcharge applies after the due date."],
+        "footer": "This is a computer-generated bill and needs no signature.",
+    },
+    {
+        "file": "12_bill_handwritten_cash_memo_lakshmi_412.jpg",
+        "id": "bill_handwritten_memo",
+        "kind": "Everyday bill",
+        "bill_kind": "handwritten_bill", "category": "pantry_and_housekeeping", "already_paid": True,
+        "title": "Handwritten-style cash memo, phone photo",
+        "what_to_expect": "A small shop's cash memo, photographed: no GSTIN, no PO, paid in cash. NoCap reads it from the photo, files it under Pantry & housekeeping, learns the shop as a new seller, and records it as already paid.",
+        "layout": "receipt", "memo": True, "photo": True,
+        "vendor_name": "Sri Lakshmi Provision Stores",
+        "header_lines": ["Shop 6, Outer Ring Road, Marathahalli, Bengaluru", "Ph 98450 22671"],
+        "doc_title": "CASH MEMO",
+        "meta": [("Memo No.", "412"), ("Date", "11/11/2026"), ("M/s", "Lumen Home Goods (office)")],
+        "lines": [
+            {"description": "Sugar (kg)", "qty": 5, "unit_price": 48.00},
+            {"description": "Tea powder (kg)", "qty": 1, "unit_price": 520.00},
+            {"description": "Milk (litre)", "qty": 20, "unit_price": 56.00},
+            {"description": "Biscuits (pkt)", "qty": 10, "unit_price": 30.00},
+        ],
+        "totals": totals(2180.00, label_total="Total"),
+        "notes": ["Received with thanks - CASH", "Goods once sold will not be taken back"],
     },
 ]
 

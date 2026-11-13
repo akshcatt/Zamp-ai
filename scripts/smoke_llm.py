@@ -31,8 +31,9 @@ from app.extract import MODEL, llm_available  # noqa: E402
 EXPECTED = {
     "01": ("APPROVE", None), "02": ("HOLD", "Procurement / Buyer"), "03": ("APPROVE", None),
     "04": ("REJECT", "Rejected: duplicate"), "05": ("HOLD", "Treasury & Fraud"),
-    "06": ("APPROVE", None), "07": ("REJECT", "Returned to vendor"), "08": ("APPROVE", None),
+    "06": ("APPROVE", None), "07": ("APPROVE", None), "08": ("APPROVE", None),
     "09": ("NOT_INVOICE", "Filed: not an invoice"),
+    "10": ("APPROVE", "Recorded: already paid"), "11": ("APPROVE", "Auto-approved → payment run"), "12": ("APPROVE", "Recorded: already paid"),
 }
 
 if not llm_available():
